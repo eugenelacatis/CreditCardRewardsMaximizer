@@ -2,6 +2,143 @@
 
 README for Credit Card Maximizer
 
+# 🚀 Agentic Wallet - AI-Powered Credit Card Optimizer
+
+An intelligent mobile app that uses AI to recommend the optimal credit card for every purchase, maximizing rewards automatically.
+
+## 📱 Features
+
+- 🤖 **AI-Powered Recommendations** - Llama 3 analyzes your cards in real-time
+- 💳 **Multi-Card Management** - Track 2-10+ credit cards
+- 🎯 **Goal Optimization** - Maximize cash back, travel points, or balanced rewards
+- 📊 **Savings Analytics** - See how much you've saved vs suboptimal choices
+- ⚡ **Instant Decisions** - Get recommendations in <2 seconds
+
+## 🛠️ Tech Stack
+
+**Backend:**
+- FastAPI (Python)
+- LangChain + Groq (Llama 3 AI)
+- SQLite database
+
+**Frontend:**
+- React Native (Expo)
+- Cross-platform (iOS, Android, Web)
+
+## 🚀 Setup Instructions
+
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- Expo Go app on phone (optional)
+
+### Backend Setup
+
+1. Navigate to backend folder:
+```bash
+cd backend
+```
+
+2. Create virtual environment:
+```bash
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Mac/Linux
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Create `.env` file from template:
+```bash
+cp .env.example .env
+```
+
+5. Add your Groq API key to `.env`:
+- Get free key at: https://console.groq.com/
+- Add to `.env`: `GROQ_API_KEY=your_key_here`
+
+6. Start backend:
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Backend will be at: http://localhost:8000/docs
+
+### Frontend Setup
+
+1. Navigate to frontend folder:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Update API URL in `src/services/api.js`:
+- For local development: `http://localhost:8000/api/v1`
+- For phone testing: `http://YOUR_IP:8000/api/v1`
+
+4. Start Expo:
+```bash
+npx expo start
+```
+
+5. Open app:
+- Press `w` for web browser
+- Scan QR code with Expo Go app
+- Press `a` for Android emulator
+
+## 🔑 Environment Variables
+
+Create `.env` files (don't commit these!):
+
+**backend/.env:**
+```
+GROQ_API_KEY=your_groq_api_key
+DATABASE_URL=sqlite:///./agentic_wallet.db
+SECRET_KEY=your_secret_key
+```
+
+## 📦 Project Structure
+```
+agentic-wallet/
+├── backend/
+│   ├── main.py           # FastAPI app
+│   ├── agents.py         # AI agent system
+│   ├── requirements.txt
+│   └── .env             # Your secrets (not in Git!)
+└── frontend/
+    ├── App.js
+    ├── src/
+    │   ├── screens/
+    │   └── services/
+    └── package.json
+```
+
+## 🎯 Usage
+
+1. Start backend server
+2. Launch mobile app
+3. Tap "Transaction" tab
+4. Enter merchant, amount, category
+5. Select optimization goal
+6. Get AI-powered recommendation!
+
+
+
+
+
+
+
+
+
+
+
 **Project Title**
 Agentic Wallet: An Intelligent Expense Optimization Platform for Enterprises
 
