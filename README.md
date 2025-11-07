@@ -6,23 +6,22 @@ read the following for proper instructions:
 
 Install Node.js, python 3.11+, expo cli (for react native), expo go on phone
 
-# Create virtual environment
+Create virtual environment
 python -m venv venv
 
-# Activate it:
-# Windows:
+Activate it:
+Windows:
 venv\Scripts\activate
 
-# Mac/Linux:
+Mac/Linux:
 source venv/bin/activate
 
-# You should see (venv) in your terminal prompt
+You should see (venv) in your terminal prompt
 
 
 pip install -r requirements.txt
 
-# This will take 2-3 minutes
-# You should see packages installing
+This will take 2-3 minutes You should see packages installing
 
 
 Setting up frontend (react native)
