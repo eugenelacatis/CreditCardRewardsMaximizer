@@ -4,6 +4,8 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
 import os
 import json
+from typing import Dict, List, Optional
+from models import OptimizationGoalEnum, CategoryEnum
 
 class AgenticRecommendationSystem:
     """
@@ -80,13 +82,16 @@ Provide your response as JSON with this structure:
                 prompt=self.recommendation_prompt
             )
     
-    def format_cards_for_llm(self, cards, category):
+    def format_cards_for_llm(self, cards: List[Dict], category: str) -> str:
         """Format card data for LLM consumption"""
         formatted = []
+        # Normalize category to enum value
+        category_key = category.lower() if isinstance(category, str) else category
+        
         for card in cards:
-            cash_back_rate = card.get('cash_back_rate', {}).get(category, 
+            cash_back_rate = card.get('cash_back_rate', {}).get(category_key, 
                             card.get('cash_back_rate', {}).get('other', 0))
-            points_mult = card.get('points_multiplier', {}).get(category,
+            points_mult = card.get('points_multiplier', {}).get(category_key,
                          card.get('points_multiplier', {}).get('other', 0))
             
             formatted.append(f"""
@@ -98,9 +103,16 @@ Card: {card['card_name']} ({card['issuer']})
 """)
         return "\n".join(formatted)
     
-    def get_recommendation(self, transaction_data, user_cards):
+    def get_recommendation(self, transaction_data: Dict, user_cards: List[Dict]) -> Dict:
         """
         Main agentic workflow - coordinates multiple reasoning steps
+        
+        Args:
+            transaction_data: Dict with keys: merchant, amount, category, optimization_goal
+            user_cards: List of card dictionaries
+            
+        Returns:
+            Dict with recommendation details
         """
         # If no LLM available, use fallback immediately
         if not self.llm:
@@ -230,11 +242,11 @@ Card: {card['card_name']} ({card['issuer']})
         
         return sorted(alternatives, key=lambda x: x['expected_value'], reverse=True)[:2]
     
-    def _fallback_recommendation(self, transaction_data, cards):
+    def _fallback_recommendation(self, transaction_data: Dict, cards: List[Dict]) -> Dict:
         """Fallback rule-based recommendation when AI is unavailable"""
         # Calculate value for each card
         card_values = []
-        category = transaction_data['category']
+        category = transaction_data['category'].lower() if isinstance(transaction_data['category'], str) else transaction_data['category']
         amount = transaction_data['amount']
         
         for card in cards:
