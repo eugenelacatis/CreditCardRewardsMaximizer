@@ -12,29 +12,48 @@ class AgenticRecommendationSystem:
     """
     
     def __init__(self):
-        # Initialize Groq LLM with Llama 3
-        self.llm = ChatGroq(
-            api_key=os.getenv("GROQ_API_KEY"),
-            model_name="llama-3.3-70b-versatile",  # Using Llama 3 70B
-            temperature=0.7,
-            max_tokens=1000
-        )
+        # Initialize Groq LLM with Llama 3 (lazy initialization)
+        self.llm = None
+        self.groq_api_key = os.getenv("GROQ_API_KEY")
         
-        # Define the main recommendation prompt
-        self.recommendation_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert financial advisor specializing in credit card rewards optimization.
-            You analyze credit cards and make intelligent recommendations based on user goals.
-            
-            Your job is to:
-            1. Analyze each card's rewards structure
-            2. Consider the user's optimization goal
-            3. Factor in applicable benefits and offers
-            4. Provide a clear, actionable recommendation
-            5. Explain your reasoning in 2-3 sentences
-            
-            Be conversational, helpful, and confident in your recommendation."""),
-            
-            ("user", """Transaction Details:
+        # Only initialize if API key is present
+        if self.groq_api_key:
+            try:
+                self.llm = ChatGroq(
+                    api_key=self.groq_api_key,
+                    model_name="llama-3.3-70b-versatile",  # Using Llama 3 70B
+                    temperature=0.7,
+                    max_tokens=1000
+                )
+                print("✓ Groq AI initialized successfully")
+            except Exception as e:
+                print(f"⚠ Warning: Could not initialize Groq AI: {e}")
+                print("  Falling back to rule-based recommendations")
+                self.llm = None
+        else:
+            print("⚠ Warning: GROQ_API_KEY not found in environment")
+            print("  Using rule-based recommendations instead of AI")
+        
+        # Only create prompt and chain if LLM is available
+        self.recommendation_prompt = None
+        self.recommendation_chain = None
+        
+        if self.llm:
+            # Define the main recommendation prompt
+            self.recommendation_prompt = ChatPromptTemplate.from_messages([
+                ("system", """You are an expert financial advisor specializing in credit card rewards optimization.
+                You analyze credit cards and make intelligent recommendations based on user goals.
+                
+                Your job is to:
+                1. Analyze each card's rewards structure
+                2. Consider the user's optimization goal
+                3. Factor in applicable benefits and offers
+                4. Provide a clear, actionable recommendation
+                5. Explain your reasoning in 2-3 sentences
+                
+                Be conversational, helpful, and confident in your recommendation."""),
+                
+                ("user", """Transaction Details:
 Merchant: {merchant}
 Amount: ${amount}
 Category: {category}
@@ -53,13 +72,13 @@ Provide your response as JSON with this structure:
     "points": points_earned,
     "reasoning": "why this is the best choice"
 }}""")
-        ])
-        
-        # Create the chain
-        self.recommendation_chain = LLMChain(
-            llm=self.llm,
-            prompt=self.recommendation_prompt
-        )
+            ])
+            
+            # Create the chain
+            self.recommendation_chain = LLMChain(
+                llm=self.llm,
+                prompt=self.recommendation_prompt
+            )
     
     def format_cards_for_llm(self, cards, category):
         """Format card data for LLM consumption"""
@@ -83,6 +102,11 @@ Card: {card['card_name']} ({card['issuer']})
         """
         Main agentic workflow - coordinates multiple reasoning steps
         """
+        # If no LLM available, use fallback immediately
+        if not self.llm:
+            print("Using rule-based fallback (no AI available)")
+            return self._fallback_recommendation(transaction_data, user_cards)
+        
         # Format data for LLM
         cards_info = self.format_cards_for_llm(
             user_cards, 
@@ -207,22 +231,59 @@ Card: {card['card_name']} ({card['issuer']})
         return sorted(alternatives, key=lambda x: x['expected_value'], reverse=True)[:2]
     
     def _fallback_recommendation(self, transaction_data, cards):
-        """Fallback if AI fails"""
-        best_card = cards[0]
+        """Fallback rule-based recommendation when AI is unavailable"""
+        # Calculate value for each card
+        card_values = []
+        category = transaction_data['category']
+        amount = transaction_data['amount']
+        
+        for card in cards:
+            cash_back_rate = card.get('cash_back_rate', {}).get(category, 
+                            card.get('cash_back_rate', {}).get('other', 0))
+            points_mult = card.get('points_multiplier', {}).get(category,
+                         card.get('points_multiplier', {}).get('other', 0))
+            
+            cash_back = amount * cash_back_rate
+            points = amount * points_mult
+            value = cash_back + (points * 0.015)  # 1 point = $0.015
+            
+            card_values.append({
+                "card": card,
+                "cash_back": cash_back,
+                "points": points,
+                "value": value
+            })
+        
+        # Sort by value
+        card_values.sort(key=lambda x: x['value'], reverse=True)
+        best = card_values[0]
+        
         return {
             "recommended_card": {
-                "card_id": best_card['card_id'],
-                "card_name": best_card['card_name'],
-                "expected_value": 10.0,
-                "cash_back_earned": 5.0,
-                "points_earned": 50.0,
-                "applicable_benefits": best_card.get('benefits', [])[:2],
-                "explanation": "Fallback recommendation - AI temporarily unavailable",
-                "confidence_score": 0.5
+                "card_id": best['card']['card_id'],
+                "card_name": best['card']['card_name'],
+                "expected_value": round(best['value'], 2),
+                "cash_back_earned": round(best['cash_back'], 2),
+                "points_earned": round(best['points'], 2),
+                "applicable_benefits": best['card'].get('benefits', [])[:2],
+                "explanation": f"Rule-based recommendation: {best['card']['card_name']} offers the best value for {category} purchases with ${best['value']:.2f} in rewards.",
+                "confidence_score": 0.75
             },
-            "alternative_cards": [],
-            "optimization_summary": "Using fallback recommendation",
-            "total_savings": 10.0
+            "alternative_cards": [
+                {
+                    "card_id": alt['card']['card_id'],
+                    "card_name": alt['card']['card_name'],
+                    "expected_value": round(alt['value'], 2),
+                    "cash_back_earned": round(alt['cash_back'], 2),
+                    "points_earned": round(alt['points'], 2),
+                    "applicable_benefits": alt['card'].get('benefits', [])[:2],
+                    "explanation": f"Alternative earning ${alt['value']:.2f}",
+                    "confidence_score": 0.7
+                }
+                for alt in card_values[1:3]
+            ],
+            "optimization_summary": f"For ${amount:.2f} at {transaction_data.get('merchant', 'this merchant')}, use {best['card']['card_name']} (rule-based recommendation)",
+            "total_savings": round(best['value'], 2)
         }
 
 # Initialize the agentic system
