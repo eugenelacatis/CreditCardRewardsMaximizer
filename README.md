@@ -39,6 +39,63 @@ docker-compose up
 - **Frontend (Expo Web)**: http://localhost:19006
 - **Health Check**: http://localhost:8000/health
 
+### Mobile Testing (iOS/Android)
+
+Docker cannot run iOS/Android simulators. Choose one of the following methods:
+
+#### Option 1: Expo Go App (Recommended - No Xcode Required)
+
+Test on your physical iPhone/Android device:
+
+**Prerequisites:**
+- Install "Expo Go" app from App Store (iOS) or Play Store (Android)
+- Ensure your phone and Mac are on the **same WiFi network**
+
+**Steps:**
+```bash
+# Stop frontend container if running
+docker-compose stop frontend
+
+# Start backend services only
+docker-compose up backend postgres -d
+
+# Run frontend locally
+cd frontend
+npm install  # First time only or when package.json changes
+npx expo start
+
+# Scan the QR code displayed in terminal with:
+# - iOS: Camera app or Expo Go app
+# - Android: Expo Go app
+```
+
+#### Option 2: iOS Simulator (Requires Xcode)
+
+Test using the iOS Simulator on your Mac:
+
+**Prerequisites:**
+- Install Xcode from App Store (~15GB download)
+- Install Xcode Command Line Tools: `xcode-select --install`
+
+**Steps:**
+```bash
+# Stop frontend container if running
+docker-compose stop frontend
+
+# Start backend services only
+docker-compose up backend postgres -d
+
+# Run frontend locally
+cd frontend
+npm install  # First time only or when package.json changes
+npx expo start
+
+# Press 'i' in the terminal to launch iOS Simulator
+# Or press 'a' for Android Emulator (requires Android Studio)
+```
+
+**Note:** The Expo dev server must run on your Mac (not in Docker) to connect to simulators or physical devices.
+
 ---
 
 ## 🛠️ Manual Setup (Alternative)

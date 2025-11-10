@@ -4,6 +4,24 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
 import os
 import json
+import logging
+from typing import Dict, List, Optional, Tuple
+from models import OptimizationGoalEnum, CategoryEnum
+
+# Configure logging
+log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, 'agent.log')
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 class AgenticRecommendationSystem:
     """
@@ -80,13 +98,16 @@ Provide your response as JSON with this structure:
                 prompt=self.recommendation_prompt
             )
     
-    def format_cards_for_llm(self, cards, category):
+    def format_cards_for_llm(self, cards: List[Dict], category: str) -> str:
         """Format card data for LLM consumption"""
         formatted = []
+        # Normalize category to enum value
+        category_key = category.lower() if isinstance(category, str) else category
+        
         for card in cards:
-            cash_back_rate = card.get('cash_back_rate', {}).get(category, 
+            cash_back_rate = card.get('cash_back_rate', {}).get(category_key, 
                             card.get('cash_back_rate', {}).get('other', 0))
-            points_mult = card.get('points_multiplier', {}).get(category,
+            points_mult = card.get('points_multiplier', {}).get(category_key,
                          card.get('points_multiplier', {}).get('other', 0))
             
             formatted.append(f"""
@@ -98,23 +119,174 @@ Card: {card['card_name']} ({card['issuer']})
 """)
         return "\n".join(formatted)
     
-    def get_recommendation(self, transaction_data, user_cards):
+    def calculate_card_value(
+        self, 
+        card: Dict, 
+        amount: float, 
+        category: str, 
+        goal: str
+    ) -> Tuple[float, Dict]:
         """
-        Main agentic workflow - coordinates multiple reasoning steps
-        """
-        # If no LLM available, use fallback immediately
-        if not self.llm:
-            print("Using rule-based fallback (no AI available)")
-            return self._fallback_recommendation(transaction_data, user_cards)
+        Calculate weighted value for a card based on optimization goal
         
-        # Format data for LLM
-        cards_info = self.format_cards_for_llm(
-            user_cards, 
-            transaction_data['category']
+        Args:
+            card: Card dictionary with rewards structure
+            amount: Transaction amount
+            category: Transaction category
+            goal: Optimization goal (cash_back, travel_points, balanced, specific_discounts)
+            
+        Returns:
+            Tuple of (total_value, breakdown_dict)
+        """
+        category_key = category.lower() if isinstance(category, str) else category
+        
+        # Get rewards for this category
+        cash_back_rate = card.get('cash_back_rate', {}).get(category_key, 
+                        card.get('cash_back_rate', {}).get('other', 0))
+        points_mult = card.get('points_multiplier', {}).get(category_key,
+                     card.get('points_multiplier', {}).get('other', 0))
+        
+        # Calculate raw values
+        cash_back = amount * cash_back_rate
+        points = amount * points_mult
+        points_value = points * 0.015  # 1 point = $0.015
+        benefits_count = len(card.get('benefits', []))
+        benefits_value = benefits_count * 2.0  # Each benefit worth ~$2
+        
+        # Define weights based on optimization goal
+        if goal == "cash_back":
+            weights = {"cash": 1.0, "points": 0.1, "benefits": 0.5}
+        elif goal == "travel_points":
+            weights = {"cash": 0.1, "points": 1.0, "benefits": 0.5}
+        elif goal == "specific_discounts":
+            weights = {"cash": 0.3, "points": 0.3, "benefits": 2.5}  # 2.5x for benefits
+        elif goal == "balanced":
+            weights = {"cash": 0.5, "points": 0.5, "benefits": 0.5}
+        else:
+            # Default to balanced
+            weights = {"cash": 0.5, "points": 0.5, "benefits": 0.5}
+            logger.warning(f"Unknown optimization goal: {goal}, using balanced weights")
+        
+        # Calculate weighted total value
+        total_value = (
+            weights["cash"] * cash_back +
+            weights["points"] * points_value +
+            weights["benefits"] * benefits_value
         )
         
-        # Get LLM recommendation
+        # Return value and breakdown for explanation
+        breakdown = {
+            "cash_back": cash_back,
+            "points": points,
+            "points_value": points_value,
+            "benefits_count": benefits_count,
+            "benefits_value": benefits_value,
+            "weights": weights,
+            "total_value": total_value
+        }
+        
+        return total_value, breakdown
+    
+    def get_recommendation(self, transaction_data: Dict, user_cards: List[Dict]) -> Dict:
+        """
+        Main agentic workflow - coordinates multiple reasoning steps
+        
+        Args:
+            transaction_data: Dict with keys: merchant, amount, category, optimization_goal
+            user_cards: List of card dictionaries
+            
+        Returns:
+            Dict with recommendation details
+        """
+        # Input validation
+        logger.info(f"Processing recommendation request: {transaction_data.get('merchant', 'Unknown')} - ${transaction_data.get('amount', 0)}")
+        
+        # Validate user has cards
+        if not user_cards or len(user_cards) == 0:
+            logger.warning("No cards available for recommendation")
+            return {
+                "error": "No cards available",
+                "message": "Please add at least one credit card to get recommendations.",
+                "recommended_card": None
+            }
+        
+        # Validate amount
+        amount = transaction_data.get('amount', 0)
+        if amount < 0:
+            logger.error(f"Invalid negative amount: {amount}")
+            return {
+                "error": "Invalid amount",
+                "message": "Transaction amount cannot be negative.",
+                "recommended_card": None
+            }
+        
+        if amount == 0:
+            logger.info("Zero amount transaction")
+            return {
+                "recommended_card": {
+                    "card_name": "Any card",
+                    "explanation": "No rewards earned on $0 transactions. Any card works.",
+                    "expected_value": 0,
+                    "cash_back_earned": 0,
+                    "points_earned": 0
+                },
+                "optimization_summary": "No rewards for $0 transaction"
+            }
+        
+        # Validate and normalize category
+        category = transaction_data.get('category', 'other').lower()
+        valid_categories = [e.value for e in CategoryEnum]
+        if category not in valid_categories:
+            logger.warning(f"Invalid category '{category}', defaulting to 'other'")
+            transaction_data['category'] = 'other'
+        
+        # Calculate weighted scores for all cards
+        logger.info("Calculating weighted scores for all cards")
+        card_scores = []
+        for card in user_cards:
+            value, breakdown = self.calculate_card_value(
+                card,
+                transaction_data['amount'],
+                transaction_data['category'],
+                transaction_data['optimization_goal']
+            )
+            card_scores.append({
+                "card": card,
+                "value": value,
+                "breakdown": breakdown
+            })
+        
+        # Sort by value (descending)
+        card_scores.sort(key=lambda x: x['value'], reverse=True)
+        logger.info(f"Top card by calculation: {card_scores[0]['card']['card_name']} (${card_scores[0]['value']:.2f})")
+        
+        # If no LLM available, use fallback with calculated scores
+        if not self.llm:
+            logger.info("Using rule-based fallback (no AI available)")
+            return self._fallback_recommendation_with_scores(transaction_data, card_scores)
+        
+        # Get top 3 cards for AI analysis
+        top_cards = card_scores[:3]
+        
+        # Format top cards for LLM with their calculated scores
+        cards_info_with_scores = []
+        for i, item in enumerate(top_cards, 1):
+            card = item['card']
+            breakdown = item['breakdown']
+            cards_info_with_scores.append(f"""
+Rank #{i}: {card['card_name']} ({card['issuer']})
+- Calculated Value: ${item['value']:.2f}
+- Cash Back: ${breakdown['cash_back']:.2f} ({breakdown['cash_back']/transaction_data['amount']*100:.1f}%)
+- Points: {breakdown['points']:.0f} points (${breakdown['points_value']:.2f} value)
+- Benefits: {breakdown['benefits_count']} ({', '.join(card.get('benefits', [])[:3])})
+- Annual Fee: ${card['annual_fee']}
+""")
+        
+        cards_info = "\n".join(cards_info_with_scores)
+        
+        # Get LLM recommendation (AI explains WHY top card is best)
         try:
+            logger.info("Requesting AI explanation for top recommendation")
             result = self.recommendation_chain.invoke({
                 "merchant": transaction_data['merchant'],
                 "amount": transaction_data['amount'],
@@ -123,79 +295,154 @@ Card: {card['card_name']} ({card['issuer']})
                 "cards_info": cards_info
             })
             
-            # Parse LLM response
+            # Use top card from calculation (AI just provides explanation)
+            best_card_data = card_scores[0]
+            best_card = best_card_data['card']
+            best_breakdown = best_card_data['breakdown']
+            
+            # Parse AI explanation
             response_text = result['text']
+            ai_explanation = response_text.strip()
             
-            # Try to extract JSON from response
-            try:
-                # Find JSON in the response
-                start = response_text.find('{')
-                end = response_text.rfind('}') + 1
-                json_str = response_text[start:end]
-                recommendation = json.loads(json_str)
-            except:
-                # Fallback if JSON parsing fails
-                recommendation = {
-                    "recommended_card_name": user_cards[0]['card_name'],
-                    "expected_value": 0,
-                    "explanation": response_text[:200],
-                    "cash_back": 0,
-                    "points": 0,
-                    "reasoning": "AI generated recommendation"
-                }
+            # Build enhanced explanation with comparisons
+            enhanced_explanation = self._build_enhanced_explanation(
+                card_scores[:3],  # Top 3 cards
+                transaction_data,
+                ai_explanation
+            )
             
-            # Find the matching card
-            recommended_card = None
-            for card in user_cards:
-                if card['card_name'].lower() in recommendation['recommended_card_name'].lower():
-                    recommended_card = card
-                    break
-            
-            if not recommended_card:
-                recommended_card = user_cards[0]
-            
-            # Calculate actual values if not provided by LLM
-            if recommendation.get('cash_back', 0) == 0:
-                cash_back_rate = recommended_card['cash_back_rate'].get(
-                    transaction_data['category'],
-                    recommended_card['cash_back_rate'].get('other', 0)
-                )
-                recommendation['cash_back'] = transaction_data['amount'] * cash_back_rate
-            
-            if recommendation.get('points', 0) == 0:
-                points_mult = recommended_card['points_multiplier'].get(
-                    transaction_data['category'],
-                    recommended_card['points_multiplier'].get('other', 0)
-                )
-                recommendation['points'] = transaction_data['amount'] * points_mult
+            logger.info(f"Recommendation complete: {best_card['card_name']} - ${best_card_data['value']:.2f}")
             
             # Build final response
             return {
                 "recommended_card": {
-                    "card_id": recommended_card['card_id'],
-                    "card_name": recommended_card['card_name'],
-                    "expected_value": float(recommendation.get('expected_value', 
-                                          recommendation['cash_back'] + recommendation['points'] * 0.015)),
-                    "cash_back_earned": float(recommendation['cash_back']),
-                    "points_earned": float(recommendation['points']),
-                    "applicable_benefits": recommended_card.get('benefits', [])[:2],
-                    "explanation": recommendation.get('explanation', 
-                                  recommendation.get('reasoning', 'AI-powered recommendation')),
-                    "confidence_score": 0.9
+                    "card_id": best_card['card_id'],
+                    "card_name": best_card['card_name'],
+                    "expected_value": round(best_card_data['value'], 2),
+                    "cash_back_earned": round(best_breakdown['cash_back'], 2),
+                    "points_earned": round(best_breakdown['points'], 2),
+                    "applicable_benefits": best_card.get('benefits', [])[:2],
+                    "explanation": enhanced_explanation,
+                    "confidence_score": 0.95  # Higher confidence with calculation
                 },
-                "alternative_cards": self._get_alternatives(
-                    user_cards, 
-                    transaction_data, 
-                    recommended_card['card_id']
-                ),
-                "optimization_summary": f"AI recommends {recommended_card['card_name']} for maximum {transaction_data['optimization_goal'].replace('_', ' ')}",
-                "total_savings": float(recommendation.get('expected_value', 0))
+                "alternative_cards": self._build_alternatives_from_scores(card_scores[1:3]),
+                "optimization_summary": f"Best choice for {transaction_data['optimization_goal'].replace('_', ' ')}: {best_card['card_name']} (${best_card_data['value']:.2f} value)",
+                "total_savings": round(best_card_data['value'], 2)
             }
             
         except Exception as e:
-            print(f"Agentic AI Error: {e}")
+            logger.error(f"Agentic AI Error: {e}", exc_info=True)
             # Fallback to rule-based if AI fails
-            return self._fallback_recommendation(transaction_data, user_cards)
+            return self._fallback_recommendation_with_scores(transaction_data, card_scores)
+    
+    def _build_enhanced_explanation(
+        self, 
+        top_cards: List[Dict], 
+        transaction_data: Dict, 
+        ai_explanation: str
+    ) -> str:
+        """
+        Build enhanced explanation with card comparisons
+        Format: "Chase Sapphire earns 3x points (900 points = $13.50) vs. Citi 2% ($20)"
+        """
+        if len(top_cards) == 0:
+            return ai_explanation
+        
+        best = top_cards[0]
+        best_card = best['card']
+        best_breakdown = best['breakdown']
+        
+        # Build comparison string
+        comparison_parts = []
+        comparison_parts.append(
+            f"{best_card['card_name']} earns ${best_breakdown['cash_back']:.2f} cash back"
+        )
+        
+        if best_breakdown['points'] > 0:
+            comparison_parts.append(
+                f"{best_breakdown['points']:.0f} points (${best_breakdown['points_value']:.2f} value)"
+            )
+        
+        # Add comparisons with alternatives
+        if len(top_cards) > 1:
+            comparisons = []
+            for alt in top_cards[1:]:
+                alt_card = alt['card']
+                alt_breakdown = alt['breakdown']
+                
+                if alt_breakdown['cash_back'] > 0:
+                    comparisons.append(
+                        f"{alt_card['card_name']} ${alt_breakdown['cash_back']:.2f} cash back"
+                    )
+                if alt_breakdown['points'] > 0:
+                    comparisons.append(
+                        f"{alt_breakdown['points']:.0f} points"
+                    )
+            
+            if comparisons:
+                comparison_parts.append(f"vs. {' and '.join(comparisons[:2])}")
+        
+        enhanced = " ".join(comparison_parts) + ". "
+        
+        # Add AI explanation if available and meaningful
+        if ai_explanation and len(ai_explanation) > 20:
+            enhanced += ai_explanation[:300]  # Limit AI explanation length
+        
+        return enhanced
+    
+    def _build_alternatives_from_scores(self, card_scores: List[Dict]) -> List[Dict]:
+        """Build alternative cards list from calculated scores"""
+        alternatives = []
+        for item in card_scores:
+            card = item['card']
+            breakdown = item['breakdown']
+            alternatives.append({
+                "card_id": card['card_id'],
+                "card_name": card['card_name'],
+                "expected_value": round(item['value'], 2),
+                "cash_back_earned": round(breakdown['cash_back'], 2),
+                "points_earned": round(breakdown['points'], 2),
+                "applicable_benefits": card.get('benefits', [])[:2],
+                "explanation": f"Alternative earning ${item['value']:.2f} total value",
+                "confidence_score": 0.85
+            })
+        return alternatives
+    
+    def _fallback_recommendation_with_scores(
+        self, 
+        transaction_data: Dict, 
+        card_scores: List[Dict]
+    ) -> Dict:
+        """Fallback recommendation using pre-calculated scores"""
+        if not card_scores:
+            return self._fallback_recommendation(transaction_data, [])
+        
+        best = card_scores[0]
+        best_card = best['card']
+        best_breakdown = best['breakdown']
+        
+        # Build explanation
+        explanation = self._build_enhanced_explanation(
+            card_scores[:3],
+            transaction_data,
+            f"Rule-based recommendation for {transaction_data['category']} purchases."
+        )
+        
+        return {
+            "recommended_card": {
+                "card_id": best_card['card_id'],
+                "card_name": best_card['card_name'],
+                "expected_value": round(best['value'], 2),
+                "cash_back_earned": round(best_breakdown['cash_back'], 2),
+                "points_earned": round(best_breakdown['points'], 2),
+                "applicable_benefits": best_card.get('benefits', [])[:2],
+                "explanation": explanation,
+                "confidence_score": 0.80
+            },
+            "alternative_cards": self._build_alternatives_from_scores(card_scores[1:3]),
+            "optimization_summary": f"Best value for {transaction_data['optimization_goal'].replace('_', ' ')}: {best_card['card_name']}",
+            "total_savings": round(best['value'], 2)
+        }
     
     def _get_alternatives(self, cards, transaction_data, exclude_card_id):
         """Get alternative card recommendations"""
@@ -230,11 +477,11 @@ Card: {card['card_name']} ({card['issuer']})
         
         return sorted(alternatives, key=lambda x: x['expected_value'], reverse=True)[:2]
     
-    def _fallback_recommendation(self, transaction_data, cards):
+    def _fallback_recommendation(self, transaction_data: Dict, cards: List[Dict]) -> Dict:
         """Fallback rule-based recommendation when AI is unavailable"""
         # Calculate value for each card
         card_values = []
-        category = transaction_data['category']
+        category = transaction_data['category'].lower() if isinstance(transaction_data['category'], str) else transaction_data['category']
         amount = transaction_data['amount']
         
         for card in cards:

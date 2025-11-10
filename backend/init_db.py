@@ -1,86 +1,102 @@
 """
-Initialize Database - Creates all tables
-Run this ONCE to set up your database
+Initialize Database - Creates tables and seeds test data
+Combined init + seed for Docker startup
 """
 
-from database import db, init_db
+from database import db
+from crud import create_user, create_credit_card
+from models import Base, OptimizationGoalEnum, CardIssuerEnum
 
-if __name__ == "__main__":
-    print("\n" + "="*70)
-    print("  🚀 INITIALIZING AGENTIC WALLET DATABASE")
-    print("="*70)
+
+def init_and_seed_database():
+    """Initialize database tables and seed with test data"""
     
-    # Check connection first
-    print("\n📡 Testing database connection...")
-    if not db.health_check():
-        print("\n❌ ERROR: Cannot connect to PostgreSQL!")
-        print("\n💡 Troubleshooting Steps:")
-        print("   1. Make sure Docker Desktop is running")
-        print("   2. Start PostgreSQL container:")
-        print("      docker-compose up -d")
-        print("   3. Wait 10 seconds for PostgreSQL to start")
-        print("   4. Try running this script again")
-        print("\n📋 Check Docker status:")
-        print("   docker-compose ps")
-        exit(1)
-    
-    print("✅ Database connection successful!")
-    print(f"   Connected to: {db.config.DATABASE_URL}")
-    
-    print("\n📋 Creating database tables...")
-    print("   This will create:")
-    print("   • users table")
-    print("   • credit_cards table")
-    print("   • card_benefits table")
-    print("   • transactions table")
-    print("   • transaction_feedback table")
-    print("   • user_behavior table")
-    print("   • automation_rules table")
-    print("   • merchants table")
-    print("   • offers table")
-    print("   • ai_model_metrics table")
+    print("\n" + "="*60)
+    print("🔧 INITIALIZING DATABASE")
+    print("="*60)
     
     # Create all tables
+    print("\n📋 Creating database tables...")
     try:
-        init_db()
+        db.create_tables()
+        print("✅ Tables created successfully!")
     except Exception as e:
-        print(f"\n❌ Error creating tables: {e}")
-        print("\n💡 This might be because tables already exist.")
-        print("   If you want to recreate them:")
-        print("   1. Drop existing database:")
-        print("      docker-compose down -v")
-        print("   2. Start fresh:")
-        print("      docker-compose up -d")
-        print("   3. Wait 10 seconds")
-        print("   4. Run this script again")
-        exit(1)
+        print(f"⚠️  Tables may already exist: {e}")
     
-    print("\n" + "="*70)
-    print("  ✅ DATABASE INITIALIZATION COMPLETE!")
-    print("="*70)
+    # Seed with test data
+    print("\n🌱 Seeding test data...")
     
-    print("\n📊 Database Tables Created:")
-    print("   ✅ users                - User accounts")
-    print("   ✅ credit_cards         - User's credit cards")
-    print("   ✅ card_benefits        - Card benefits & offers")
-    print("   ✅ transactions         - Purchase history")
-    print("   ✅ transaction_feedback - User feedback")
-    print("   ✅ user_behavior        - Learned preferences")
-    print("   ✅ automation_rules     - User automation rules")
-    print("   ✅ merchants            - Store/merchant database")
-    print("   ✅ offers               - Special promotions")
-    print("   ✅ ai_model_metrics     - AI performance tracking")
-    
-    print("\n🎯 Next Steps:")
-    print("   1. Seed database with sample data:")
-    print("      python seed_database.py")
-    print("\n   2. Test database connection:")
-    print("      python test_existing_db.py")
-    print("\n   3. Start API server:")
-    print("      uvicorn main:app --reload --host 0.0.0.0 --port 8000")
-    print("\n   4. Open Swagger UI:")
-    print("      http://localhost:8000/docs")
-    
-    print("\n" + "="*70)
-    print("  🎉 READY TO GO!")
-    print("="*70 + "\n")
+    with db.session_scope() as session:
+        # Create test user
+        print("\n👤 Creating test user...")
+        user = create_user(
+            session,
+            email="test@example.com",
+            full_name="Test User",
+            phone="+1234567890",
+            default_optimization_goal=OptimizationGoalEnum.CASH_BACK
+        )
+        print(f"   ✅ Created user: {user.email}")
+        print(f"   🔑 USER_ID: {user.user_id}")
+        
+        # Create test credit cards
+        print(f"\n💳 Creating credit cards...")
+        
+        chase = create_credit_card(
+            session,
+            user_id=user.user_id,
+            card_name="Chase Sapphire Reserve",
+            issuer=CardIssuerEnum.CHASE,
+            cash_back_rate={"dining": 0.03, "travel": 0.03, "other": 0.01},
+            points_multiplier={"dining": 3.0, "travel": 3.0, "other": 1.0},
+            annual_fee=550.0,
+            benefits=["Airport Lounge Access", "Travel Insurance", "$300 Travel Credit"],
+            last_four_digits="4123",
+            credit_limit=20000.0
+        )
+        print(f"   ✅ {chase.card_name}")
+        
+        citi = create_credit_card(
+            session,
+            user_id=user.user_id,
+            card_name="Citi Double Cash",
+            issuer=CardIssuerEnum.CITI,
+            cash_back_rate={"dining": 0.02, "travel": 0.02, "groceries": 0.02, "gas": 0.02, "other": 0.02},
+            points_multiplier={"dining": 0.0, "travel": 0.0, "other": 0.0},
+            annual_fee=0.0,
+            benefits=["2% Cash Back on Everything"],
+            last_four_digits="8765",
+            credit_limit=15000.0
+        )
+        print(f"   ✅ {citi.card_name}")
+        
+        amex = create_credit_card(
+            session,
+            user_id=user.user_id,
+            card_name="American Express Gold",
+            issuer=CardIssuerEnum.AMEX,
+            cash_back_rate={"dining": 0.04, "groceries": 0.04, "other": 0.01},
+            points_multiplier={"dining": 4.0, "groceries": 4.0, "other": 1.0},
+            annual_fee=250.0,
+            benefits=["Dining Credits", "Uber Credits", "No Foreign Fees"],
+            last_four_digits="1005",
+            credit_limit=25000.0
+        )
+        print(f"   ✅ {amex.card_name}")
+        
+        session.commit()
+        
+        print("\n" + "="*60)
+        print("✨ DATABASE READY!")
+        print("="*60)
+        print(f"\n📊 Test Account:")
+        print(f"   Email: {user.email}")
+        print(f"   User ID: {user.user_id}")
+        print(f"   Cards: 3 (Chase, Citi, Amex)")
+        print(f"\n🔗 API Base URL: http://localhost:8000/api/v1")
+        print(f"   Test endpoint: GET /api/v1/users/{user.user_id}/cards")
+        print("="*60 + "\n")
+
+
+if __name__ == "__main__":
+    init_and_seed_database()
