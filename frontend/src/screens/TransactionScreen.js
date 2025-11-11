@@ -37,6 +37,7 @@ export default function TransactionScreen() {
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [recommendation, setRecommendation] = useState(null);
+  const [currentTransaction, setCurrentTransaction] = useState(null); // Store current transaction
 
   const handleGetRecommendation = async () => {
     // Validation
@@ -54,13 +55,18 @@ export default function TransactionScreen() {
     try {
       console.log('Sending request to API...');
       
-      const response = await API.getRecommendation({
+      const transactionData = {
         user_id: 'user123',
         merchant: merchant.trim(),
         amount: parseFloat(amount),
         category: selectedCategory,
         optimization_goal: selectedGoal,
-      });
+      };
+
+      // Store transaction data for later
+      setCurrentTransaction(transactionData);
+
+      const response = await API.getRecommendation(transactionData);
 
       console.log('API Response:', response.data);
       
@@ -76,6 +82,61 @@ export default function TransactionScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // NEW FUNCTION: Save transaction to database
+  const handleSaveTransaction = async (usedRecommendation = true) => {
+    if (!currentTransaction || !recommendation) return;
+
+    try {
+      console.log('Saving transaction to database...');
+
+      // Prepare transaction record
+      const transactionRecord = {
+        user_id: currentTransaction.user_id,
+        merchant: currentTransaction.merchant,
+        amount: currentTransaction.amount,
+        category: currentTransaction.category,
+        optimization_goal: currentTransaction.optimization_goal,
+        card_used: recommendation.recommended_card.card_name,
+        card_recommended: recommendation.recommended_card.card_name,
+        cash_back_earned: recommendation.recommended_card.cash_back_earned,
+        points_earned: recommendation.recommended_card.points_earned,
+        expected_value: recommendation.recommended_card.expected_value,
+        optimal: usedRecommendation, // Did they use the recommended card?
+        timestamp: new Date().toISOString(),
+      };
+
+      // TODO: Call your backend API to save transaction
+      // await API.saveTransaction(transactionRecord);
+      
+      console.log('Transaction saved:', transactionRecord);
+      
+      // For now, just log it
+      // Once Irwin (Person 2) creates the save endpoint, uncomment the API call above
+
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+      // Don't block the user if saving fails
+    }
+  };
+
+  const handleCloseModal = async () => {
+    // Save the transaction before closing
+    await handleSaveTransaction(true);
+    
+    // Close modal and reset form
+    setShowResult(false);
+    setMerchant('');
+    setAmount('');
+    setRecommendation(null);
+    setCurrentTransaction(null);
+    
+    Alert.alert(
+      'Success! 🎉',
+      'Transaction recorded. Check your history to see your savings!',
+      [{ text: 'OK' }]
+    );
   };
 
   const CategoryButton = ({ category }) => {
@@ -191,17 +252,18 @@ export default function TransactionScreen() {
                 </View>
               )}
 
-              {/* Action Button */}
+              {/* Action Button - NOW SAVES TRANSACTION! */}
               <TouchableOpacity
                 style={styles.doneButton}
-                onPress={() => {
-                  setShowResult(false);
-                  setMerchant('');
-                  setAmount('');
-                }}
+                onPress={handleCloseModal} // Changed to use new handler
               >
-                <Text style={styles.doneButtonText}>Got It!</Text>
+                <Text style={styles.doneButtonText}>✓ Record Transaction</Text>
               </TouchableOpacity>
+
+              {/* Info text */}
+              <Text style={styles.infoText}>
+                💡 This transaction will be saved to your history
+              </Text>
             </ScrollView>
           </View>
         </View>
@@ -542,7 +604,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   doneButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#4CAF50', // Changed to green to indicate saving
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
@@ -553,4 +615,566 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  infoText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 12,
+  },
 });
+// import React, { useState } from 'react';
+// import {
+//   View,
+//   Text,
+//   StyleSheet,
+//   TextInput,
+//   TouchableOpacity,
+//   ScrollView,
+//   Modal,
+//   ActivityIndicator,
+//   Alert,
+// } from 'react-native';
+// import { SafeAreaView } from 'react-native-safe-area-context';
+// import { API } from '../services/api';
+
+// const CATEGORIES = [
+//   { id: 'dining', label: 'Dining', emoji: '🍽️' },
+//   { id: 'travel', label: 'Travel', emoji: '✈️' },
+//   { id: 'groceries', label: 'Groceries', emoji: '🛒' },
+//   { id: 'gas', label: 'Gas', emoji: '⛽' },
+//   { id: 'entertainment', label: 'Entertainment', emoji: '🎬' },
+//   { id: 'shopping', label: 'Shopping', emoji: '🛍️' },
+//   { id: 'other', label: 'Other', emoji: '📦' },
+// ];
+
+// const GOALS = [
+//   { id: 'cash_back', label: 'Cash Back', emoji: '💵' },
+//   { id: 'travel_points', label: 'Travel Points', emoji: '✈️' },
+//   { id: 'balanced', label: 'Balanced', emoji: '⚖️' },
+// ];
+
+// export default function TransactionScreen() {
+//   const [merchant, setMerchant] = useState('');
+//   const [amount, setAmount] = useState('');
+//   const [selectedCategory, setSelectedCategory] = useState('dining');
+//   const [selectedGoal, setSelectedGoal] = useState('cash_back');
+//   const [loading, setLoading] = useState(false);
+//   const [showResult, setShowResult] = useState(false);
+//   const [recommendation, setRecommendation] = useState(null);
+
+//   const handleGetRecommendation = async () => {
+//     // Validation
+//     if (!merchant.trim()) {
+//       Alert.alert('Error', 'Please enter a merchant name');
+//       return;
+//     }
+//     if (!amount || parseFloat(amount) <= 0) {
+//       Alert.alert('Error', 'Please enter a valid amount');
+//       return;
+//     }
+
+//     setLoading(true);
+    
+//     try {
+//       console.log('Sending request to API...');
+      
+//       const response = await API.getRecommendation({
+//         user_id: 'user123',
+//         merchant: merchant.trim(),
+//         amount: parseFloat(amount),
+//         category: selectedCategory,
+//         optimization_goal: selectedGoal,
+//       });
+
+//       console.log('API Response:', response.data);
+      
+//       setRecommendation(response.data);
+//       setShowResult(true);
+      
+//     } catch (error) {
+//       console.error('API Error:', error);
+//       Alert.alert(
+//         'Connection Error', 
+//         'Could not connect to server. Make sure backend is running.\n\nError: ' + error.message
+//       );
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const CategoryButton = ({ category }) => {
+//     const isSelected = selectedCategory === category.id;
+//     return (
+//       <TouchableOpacity
+//         style={[styles.categoryButton, isSelected && styles.categoryButtonSelected]}
+//         onPress={() => setSelectedCategory(category.id)}
+//       >
+//         <Text style={styles.categoryEmoji}>{category.emoji}</Text>
+//         <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
+//           {category.label}
+//         </Text>
+//       </TouchableOpacity>
+//     );
+//   };
+
+//   const GoalButton = ({ goal }) => {
+//     const isSelected = selectedGoal === goal.id;
+//     return (
+//       <TouchableOpacity
+//         style={[styles.goalButton, isSelected && styles.goalButtonSelected]}
+//         onPress={() => setSelectedGoal(goal.id)}
+//       >
+//         <Text style={styles.goalEmoji}>{goal.emoji}</Text>
+//         <Text style={[styles.goalText, isSelected && styles.goalTextSelected]}>
+//           {goal.label}
+//         </Text>
+//       </TouchableOpacity>
+//     );
+//   };
+
+//   const ResultModal = () => {
+//     if (!recommendation) return null;
+
+//     const card = recommendation.recommended_card;
+
+//     return (
+//       <Modal visible={showResult} animationType="slide" transparent>
+//         <View style={styles.modalOverlay}>
+//           <View style={styles.modalContent}>
+//             <ScrollView>
+//               {/* Header */}
+//               <View style={styles.modalHeader}>
+//                 <Text style={styles.modalTitle}>✨ AI Recommendation</Text>
+//                 <TouchableOpacity onPress={() => setShowResult(false)}>
+//                   <Text style={styles.closeButton}>✕</Text>
+//                 </TouchableOpacity>
+//               </View>
+
+//               {/* Recommended Card */}
+//               <View style={styles.recommendedCard}>
+//                 <Text style={styles.useThisLabel}>USE THIS CARD</Text>
+//                 <Text style={styles.cardName}>{card.card_name}</Text>
+
+//                 <View style={styles.valueBox}>
+//                   <Text style={styles.valueLabel}>Expected Value</Text>
+//                   <Text style={styles.valueAmount}>
+//                     ${card.expected_value.toFixed(2)}
+//                   </Text>
+//                 </View>
+
+//                 <View style={styles.rewardsRow}>
+//                   <View style={styles.rewardItem}>
+//                     <Text style={styles.rewardEmoji}>💵</Text>
+//                     <Text style={styles.rewardLabel}>Cash Back</Text>
+//                     <Text style={styles.rewardValue}>
+//                       ${card.cash_back_earned.toFixed(2)}
+//                     </Text>
+//                   </View>
+                  
+//                   <View style={styles.rewardDivider} />
+                  
+//                   <View style={styles.rewardItem}>
+//                     <Text style={styles.rewardEmoji}>⭐</Text>
+//                     <Text style={styles.rewardLabel}>Points</Text>
+//                     <Text style={styles.rewardValue}>
+//                       {card.points_earned.toFixed(0)}
+//                     </Text>
+//                   </View>
+//                 </View>
+
+//                 <View style={styles.explanationBox}>
+//                   <Text style={styles.explanationText}>{card.explanation}</Text>
+//                 </View>
+
+//                 {card.applicable_benefits && card.applicable_benefits.length > 0 && (
+//                   <View style={styles.benefitsBox}>
+//                     <Text style={styles.benefitsTitle}>✨ Extra Benefits</Text>
+//                     {card.applicable_benefits.map((benefit, idx) => (
+//                       <Text key={idx} style={styles.benefitItem}>
+//                         • {benefit}
+//                       </Text>
+//                     ))}
+//                   </View>
+//                 )}
+//               </View>
+
+//               {/* Alternative Cards */}
+//               {recommendation.alternative_cards && recommendation.alternative_cards.length > 0 && (
+//                 <View style={styles.alternativesSection}>
+//                   <Text style={styles.alternativesTitle}>Other Options</Text>
+//                   {recommendation.alternative_cards.slice(0, 2).map((altCard, idx) => (
+//                     <View key={idx} style={styles.alternativeCard}>
+//                       <View>
+//                         <Text style={styles.alternativeCardName}>{altCard.card_name}</Text>
+//                         <Text style={styles.alternativeCardValue}>
+//                           Value: ${altCard.expected_value.toFixed(2)}
+//                         </Text>
+//                       </View>
+//                     </View>
+//                   ))}
+//                 </View>
+//               )}
+
+//               {/* Action Button */}
+//               <TouchableOpacity
+//                 style={styles.doneButton}
+//                 onPress={() => {
+//                   setShowResult(false);
+//                   setMerchant('');
+//                   setAmount('');
+//                 }}
+//               >
+//                 <Text style={styles.doneButtonText}>Got It!</Text>
+//               </TouchableOpacity>
+//             </ScrollView>
+//           </View>
+//         </View>
+//       </Modal>
+//     );
+//   };
+
+//   return (
+//     <SafeAreaView style={styles.container}>
+//       <ScrollView showsVerticalScrollIndicator={false}>
+//         {/* Header */}
+//         <View style={styles.header}>
+//           <Text style={styles.title}>New Transaction</Text>
+//           <Text style={styles.subtitle}>Get AI-powered recommendations</Text>
+//         </View>
+
+//         {/* Form */}
+//         <View style={styles.form}>
+//           {/* Merchant Input */}
+//           <Text style={styles.label}>Where are you shopping?</Text>
+//           <TextInput
+//             style={styles.input}
+//             placeholder="e.g., Starbucks, Amazon, Whole Foods"
+//             value={merchant}
+//             onChangeText={setMerchant}
+//             placeholderTextColor="#999"
+//           />
+
+//           {/* Amount Input */}
+//           <Text style={styles.label}>How much?</Text>
+//           <TextInput
+//             style={styles.input}
+//             placeholder="0.00"
+//             value={amount}
+//             onChangeText={setAmount}
+//             keyboardType="decimal-pad"
+//             placeholderTextColor="#999"
+//           />
+
+//           {/* Category Selection */}
+//           <Text style={styles.label}>What category?</Text>
+//           <View style={styles.categoriesGrid}>
+//             {CATEGORIES.map((category) => (
+//               <CategoryButton key={category.id} category={category} />
+//             ))}
+//           </View>
+
+//           {/* Goal Selection */}
+//           <Text style={styles.label}>Your goal?</Text>
+//           <View style={styles.goalsGrid}>
+//             {GOALS.map((goal) => (
+//               <GoalButton key={goal.id} goal={goal} />
+//             ))}
+//           </View>
+
+//           {/* Submit Button */}
+//           <TouchableOpacity
+//             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+//             onPress={handleGetRecommendation}
+//             disabled={loading}
+//           >
+//             {loading ? (
+//               <>
+//                 <ActivityIndicator color="#fff" />
+//                 <Text style={styles.submitButtonText}>  Getting AI Recommendation...</Text>
+//               </>
+//             ) : (
+//               <>
+//                 <Text style={styles.submitButtonText}>⚡ Get Smart Recommendation</Text>
+//               </>
+//             )}
+//           </TouchableOpacity>
+//         </View>
+//       </ScrollView>
+
+//       <ResultModal />
+//     </SafeAreaView>
+//   );
+// }
+
+// const styles = StyleSheet.create({
+//   container: {
+//     flex: 1,
+//     backgroundColor: '#F5F7FA',
+//   },
+//   header: {
+//     backgroundColor: '#4A90E2',
+//     padding: 30,
+//     alignItems: 'center',
+//   },
+//   title: {
+//     fontSize: 28,
+//     fontWeight: 'bold',
+//     color: '#fff',
+//   },
+//   subtitle: {
+//     fontSize: 14,
+//     color: '#fff',
+//     marginTop: 4,
+//     opacity: 0.9,
+//   },
+//   form: {
+//     padding: 20,
+//   },
+//   label: {
+//     fontSize: 16,
+//     fontWeight: '600',
+//     color: '#333',
+//     marginTop: 20,
+//     marginBottom: 10,
+//   },
+//   input: {
+//     backgroundColor: '#fff',
+//     padding: 15,
+//     borderRadius: 12,
+//     fontSize: 16,
+//     borderWidth: 1,
+//     borderColor: '#E0E0E0',
+//   },
+//   categoriesGrid: {
+//     flexDirection: 'row',
+//     flexWrap: 'wrap',
+//     gap: 10,
+//   },
+//   categoryButton: {
+//     width: '30%',
+//     backgroundColor: '#fff',
+//     padding: 12,
+//     borderRadius: 12,
+//     alignItems: 'center',
+//     borderWidth: 2,
+//     borderColor: '#E0E0E0',
+//   },
+//   categoryButtonSelected: {
+//     borderColor: '#4A90E2',
+//     backgroundColor: '#E3F2FD',
+//   },
+//   categoryEmoji: {
+//     fontSize: 24,
+//     marginBottom: 4,
+//   },
+//   categoryText: {
+//     fontSize: 12,
+//     color: '#666',
+//   },
+//   categoryTextSelected: {
+//     color: '#4A90E2',
+//     fontWeight: 'bold',
+//   },
+//   goalsGrid: {
+//     flexDirection: 'row',
+//     gap: 10,
+//   },
+//   goalButton: {
+//     flex: 1,
+//     backgroundColor: '#fff',
+//     padding: 15,
+//     borderRadius: 12,
+//     alignItems: 'center',
+//     borderWidth: 2,
+//     borderColor: '#E0E0E0',
+//   },
+//   goalButtonSelected: {
+//     borderColor: '#4CAF50',
+//     backgroundColor: '#E8F5E9',
+//   },
+//   goalEmoji: {
+//     fontSize: 24,
+//     marginBottom: 4,
+//   },
+//   goalText: {
+//     fontSize: 12,
+//     color: '#666',
+//   },
+//   goalTextSelected: {
+//     color: '#4CAF50',
+//     fontWeight: 'bold',
+//   },
+//   submitButton: {
+//     backgroundColor: '#4A90E2',
+//     padding: 18,
+//     borderRadius: 12,
+//     marginTop: 30,
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//   },
+//   submitButtonDisabled: {
+//     opacity: 0.6,
+//   },
+//   submitButtonText: {
+//     color: '#fff',
+//     fontSize: 16,
+//     fontWeight: 'bold',
+//   },
+//   modalOverlay: {
+//     flex: 1,
+//     backgroundColor: 'rgba(0,0,0,0.5)',
+//     justifyContent: 'flex-end',
+//   },
+//   modalContent: {
+//     backgroundColor: '#fff',
+//     borderTopLeftRadius: 24,
+//     borderTopRightRadius: 24,
+//     maxHeight: '90%',
+//     padding: 20,
+//   },
+//   modalHeader: {
+//     flexDirection: 'row',
+//     justifyContent: 'space-between',
+//     alignItems: 'center',
+//     marginBottom: 20,
+//   },
+//   modalTitle: {
+//     fontSize: 24,
+//     fontWeight: 'bold',
+//     color: '#333',
+//   },
+//   closeButton: {
+//     fontSize: 28,
+//     color: '#666',
+//   },
+//   recommendedCard: {
+//     backgroundColor: '#F0F8FF',
+//     padding: 20,
+//     borderRadius: 16,
+//     borderWidth: 2,
+//     borderColor: '#4A90E2',
+//   },
+//   useThisLabel: {
+//     fontSize: 12,
+//     fontWeight: 'bold',
+//     color: '#4A90E2',
+//     marginBottom: 8,
+//   },
+//   cardName: {
+//     fontSize: 22,
+//     fontWeight: 'bold',
+//     color: '#333',
+//     marginBottom: 16,
+//   },
+//   valueBox: {
+//     backgroundColor: '#fff',
+//     padding: 16,
+//     borderRadius: 12,
+//     alignItems: 'center',
+//     marginBottom: 16,
+//   },
+//   valueLabel: {
+//     fontSize: 14,
+//     color: '#666',
+//   },
+//   valueAmount: {
+//     fontSize: 36,
+//     fontWeight: 'bold',
+//     color: '#4CAF50',
+//     marginTop: 4,
+//   },
+//   rewardsRow: {
+//     flexDirection: 'row',
+//     marginBottom: 16,
+//   },
+//   rewardItem: {
+//     flex: 1,
+//     alignItems: 'center',
+//   },
+//   rewardEmoji: {
+//     fontSize: 24,
+//     marginBottom: 4,
+//   },
+//   rewardDivider: {
+//     width: 1,
+//     backgroundColor: '#E0E0E0',
+//     marginHorizontal: 16,
+//   },
+//   rewardLabel: {
+//     fontSize: 12,
+//     color: '#666',
+//     marginTop: 4,
+//   },
+//   rewardValue: {
+//     fontSize: 18,
+//     fontWeight: 'bold',
+//     color: '#333',
+//     marginTop: 2,
+//   },
+//   explanationBox: {
+//     backgroundColor: '#fff',
+//     padding: 12,
+//     borderRadius: 8,
+//     marginBottom: 12,
+//   },
+//   explanationText: {
+//     fontSize: 14,
+//     color: '#555',
+//     lineHeight: 20,
+//   },
+//   benefitsBox: {
+//     backgroundColor: '#FFF9E6',
+//     padding: 12,
+//     borderRadius: 8,
+//   },
+//   benefitsTitle: {
+//     fontSize: 14,
+//     fontWeight: 'bold',
+//     color: '#333',
+//     marginBottom: 8,
+//   },
+//   benefitItem: {
+//     fontSize: 13,
+//     color: '#666',
+//     marginLeft: 8,
+//     marginVertical: 2,
+//   },
+//   alternativesSection: {
+//     marginTop: 20,
+//   },
+//   alternativesTitle: {
+//     fontSize: 16,
+//     fontWeight: 'bold',
+//     color: '#333',
+//     marginBottom: 12,
+//   },
+//   alternativeCard: {
+//     backgroundColor: '#F9F9F9',
+//     padding: 16,
+//     borderRadius: 12,
+//     marginBottom: 8,
+//   },
+//   alternativeCardName: {
+//     fontSize: 14,
+//     fontWeight: '600',
+//     color: '#333',
+//   },
+//   alternativeCardValue: {
+//     fontSize: 12,
+//     color: '#4CAF50',
+//     marginTop: 4,
+//   },
+//   doneButton: {
+//     backgroundColor: '#4A90E2',
+//     padding: 18,
+//     borderRadius: 12,
+//     alignItems: 'center',
+//     marginTop: 20,
+//   },
+//   doneButtonText: {
+//     color: '#fff',
+//     fontSize: 16,
+//     fontWeight: 'bold',
+//   },
+// });
