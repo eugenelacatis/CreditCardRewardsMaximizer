@@ -1,0 +1,732 @@
+[
+  {
+    "card_name": "Chase Sapphire Preferred",
+    "issuer": "Chase",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 3, "travel": 5, "groceries": 3, "gas": 1, "other": 1},
+    "benefits": [
+      "5x points on travel purchased through Chase Travel",
+      "3x points on dining",
+      "3x points on online grocery purchases (excluding Walmart and Target)",
+      "3x points on select streaming services",
+      "1x points on all other purchases",
+      "$50 annual hotel credit through Chase Travel",
+      "Trip cancellation and interruption insurance",
+      "Primary rental car insurance",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["travel", "dining"]
+  },
+  {
+    "card_name": "Chase Sapphire Reserve",
+    "issuer": "Chase",
+    "annual_fee": 550.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 3, "travel": 10, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "10x points on hotels and car rentals purchased through Chase Travel",
+      "5x points on air travel through Chase Travel",
+      "3x points on travel and dining",
+      "$300 annual travel credit",
+      "Priority Pass airport lounge access",
+      "Trip cancellation and interruption insurance",
+      "Primary rental car insurance",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["premium_travel", "dining"]
+  },
+  {
+    "card_name": "American Express Gold",
+    "issuer": "American Express",
+    "annual_fee": 250.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 4, "travel": 3, "groceries": 4, "gas": 1, "other": 1},
+    "benefits": [
+      "4x points at restaurants",
+      "4x points at U.S. supermarkets (up to a cap, then 1x)",
+      "3x points on flights booked directly with airlines or Amex Travel",
+      "$10 monthly dining credit at select partners (enrollment required)",
+      "$10 monthly Uber Cash for U.S. rides and eats (enrollment required)",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["dining", "groceries", "travel"]
+  },
+  {
+    "card_name": "American Express Platinum",
+    "issuer": "American Express",
+    "annual_fee": 695.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 1, "travel": 5, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "5x points on flights booked directly with airlines or Amex Travel",
+      "5x points on prepaid hotels booked through Amex Travel",
+      "Extensive airport lounge access including Centurion and Priority Pass",
+      "Annual airline fee credit (enrollment required)",
+      "Global Entry or TSA PreCheck fee credit",
+      "Hotel elite status with select partners (enrollment required)",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["premium_travel"]
+  },
+  {
+    "card_name": "Citi Double Cash",
+    "issuer": "Citi",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.02, "groceries": 0.02, "gas": 0.02, "other": 0.02},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "Earn 1% cash back when you buy plus 1% when you pay",
+      "2% effective cash back on all purchases",
+      "No annual fee"
+    ],
+    "best_for": ["flat_cash_back"]
+  },
+  {
+    "card_name": "Citi Premier",
+    "issuer": "Citi",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 3, "travel": 3, "groceries": 3, "gas": 3, "other": 1},
+    "benefits": [
+      "3x points on air travel and hotels",
+      "3x points at restaurants",
+      "3x points at supermarkets",
+      "3x points at gas stations",
+      "1x points on all other purchases",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["travel", "groceries", "gas", "dining"]
+  },
+  {
+    "card_name": "Capital One Venture",
+    "issuer": "Capital One",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 5, "groceries": 2, "gas": 2, "other": 2},
+    "benefits": [
+      "2x miles on every purchase",
+      "5x miles on hotels and rental cars booked through Capital One Travel",
+      "Global Entry or TSA PreCheck fee credit",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["simple_travel", "everyday_spend"]
+  },
+  {
+    "card_name": "Capital One Venture X",
+    "issuer": "Capital One",
+    "annual_fee": 395.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 10, "groceries": 2, "gas": 2, "other": 2},
+    "benefits": [
+      "10x miles on hotels and rental cars booked through Capital One Travel",
+      "5x miles on flights booked through Capital One Travel",
+      "2x miles on all other purchases",
+      "$300 annual travel credit through Capital One Travel",
+      "10,000 bonus miles anniversary bonus (terms apply)",
+      "Airport lounge access with Capital One and Priority Pass",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["premium_travel", "everyday_spend"]
+  },
+  {
+    "card_name": "Discover it Cash Back",
+    "issuer": "Discover",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.05, "travel": 0.05, "groceries": 0.05, "gas": 0.05, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% cash back on rotating quarterly categories (activation required, up to a cap)",
+      "1% cash back on all other purchases",
+      "Cashback Match in first year for new cardmembers",
+      "No annual fee"
+    ],
+    "best_for": ["rotating_categories", "cash_back"]
+  },
+  {
+    "card_name": "Chase Freedom Flex",
+    "issuer": "Chase",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.05, "groceries": 0.03, "gas": 0.01, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% cash back on rotating quarterly categories (activation required, up to a cap)",
+      "5% cash back on travel purchased through Chase Travel",
+      "3% cash back on dining",
+      "3% cash back on drugstore purchases",
+      "1% cash back on all other purchases",
+      "No annual fee"
+    ],
+    "best_for": ["rotating_categories", "dining", "drugstores"]
+  },
+  {
+    "card_name": "Chase Freedom Unlimited",
+    "issuer": "Chase",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.05, "groceries": 0.015, "gas": 0.015, "other": 0.015},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% cash back on travel purchased through Chase Travel",
+      "3% cash back on dining",
+      "3% cash back on drugstore purchases",
+      "1.5% cash back on all other purchases",
+      "No annual fee"
+    ],
+    "best_for": ["cash_back", "dining", "drugstores"]
+  },
+  {
+    "card_name": "Blue Cash Preferred",
+    "issuer": "American Express",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.01, "groceries": 0.06, "gas": 0.03, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "6% cash back at U.S. supermarkets (up to a cap, then 1%)",
+      "6% cash back on select U.S. streaming services",
+      "3% cash back at U.S. gas stations",
+      "3% cash back on transit",
+      "1% cash back on other purchases",
+      "No annual fee first year in some offers (check terms)"
+    ],
+    "best_for": ["groceries", "streaming", "gas"]
+  },
+  {
+    "card_name": "Blue Cash Everyday",
+    "issuer": "American Express",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.01, "groceries": 0.03, "gas": 0.03, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "3% cash back at U.S. supermarkets (up to a cap, then 1%)",
+      "3% cash back at U.S. gas stations",
+      "3% cash back on select U.S. online retail purchases",
+      "1% cash back on other purchases",
+      "No annual fee"
+    ],
+    "best_for": ["groceries", "gas", "online_shopping"]
+  },
+  {
+    "card_name": "Wells Fargo Active Cash",
+    "issuer": "Wells Fargo",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.02, "groceries": 0.02, "gas": 0.02, "other": 0.02},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "2% cash back on all purchases",
+      "Cell phone protection when you pay your bill with the card (terms apply)",
+      "No annual fee"
+    ],
+    "best_for": ["flat_cash_back"]
+  },
+  {
+    "card_name": "Bank of America Customized Cash Rewards",
+    "issuer": "Bank of America",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.01, "groceries": 0.02, "gas": 0.03, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "3% cash back in a category of your choice (gas, online shopping, dining, travel, drug stores, home improvement/furnishings)",
+      "2% cash back at grocery stores and wholesale clubs",
+      "1% cash back on all other purchases",
+      "Preferred Rewards clients can earn higher rewards rates",
+      "No annual fee"
+    ],
+    "best_for": ["custom_categories", "gas", "online_shopping"]
+  },
+  {
+    "card_name": "Chase Freedom Student",
+    "issuer": "Chase",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.01, "travel": 0.01, "groceries": 0.01, "gas": 0.01, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "1% cash back on all purchases",
+      "Credit limit increase consideration with responsible use",
+      "No annual fee"
+    ],
+    "best_for": ["students", "starter"]
+  },
+  {
+    "card_name": "Discover it Student Cash Back",
+    "issuer": "Discover",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.05, "travel": 0.05, "groceries": 0.05, "gas": 0.05, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% cash back on rotating quarterly categories (activation required, up to a cap)",
+      "1% cash back on all other purchases",
+      "Good Grade Reward for students (terms apply)",
+      "No annual fee"
+    ],
+    "best_for": ["students", "rotating_categories"]
+  },
+  {
+    "card_name": "Capital One Savor",
+    "issuer": "Capital One",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0.04, "travel": 0.01, "groceries": 0.02, "gas": 0.01, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "4% cash back on dining and entertainment",
+      "3% cash back at grocery stores",
+      "1% cash back on all other purchases",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["dining", "entertainment"]
+  },
+  {
+    "card_name": "Capital One SavorOne",
+    "issuer": "Capital One",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.01, "groceries": 0.03, "gas": 0.01, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "3% cash back on dining, entertainment, popular streaming services, and at grocery stores",
+      "1% cash back on all other purchases",
+      "No annual fee"
+    ],
+    "best_for": ["dining", "entertainment", "groceries"]
+  },
+  {
+    "card_name": "Chase Slate Edge",
+    "issuer": "Chase",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "Intro APR on purchases and balance transfers (terms apply)",
+      "Automatic review for APR reduction with responsible use",
+      "No annual fee"
+    ],
+    "best_for": ["balance_transfers", "intro_apr"]
+  },
+  {
+    "card_name": "Citi Custom Cash",
+    "issuer": "Citi",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.05, "travel": 0.05, "groceries": 0.05, "gas": 0.05, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% cash back on up to a cap in your highest eligible spend category each billing cycle",
+      "1% cash back on all other purchases",
+      "No annual fee"
+    ],
+    "best_for": ["custom_categories", "cash_back"]
+  },
+  {
+    "card_name": "Citi Rewards+",
+    "issuer": "Citi",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0.02, "gas": 0.02, "other": 0},
+    "points_multiplier": {"dining": 1, "travel": 1, "groceries": 2, "gas": 2, "other": 1},
+    "benefits": [
+      "2x points at supermarkets and gas stations",
+      "1x points on all other purchases",
+      "Every purchase rounded up to the nearest 10 points",
+      "No annual fee"
+    ],
+    "best_for": ["groceries", "gas"]
+  },
+  {
+    "card_name": "Chase Amazon Prime Rewards",
+    "issuer": "Chase",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.02, "groceries": 0.02, "gas": 0.02, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% back at Amazon.com and Whole Foods Market for eligible Prime members",
+      "2% back at restaurants, gas stations, and drugstores",
+      "1% back on all other purchases",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["amazon", "groceries", "online_shopping"]
+  },
+  {
+    "card_name": "Target REDcard Credit Card",
+    "issuer": "TD Bank",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0.05, "gas": 0, "other": 0.05},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% off most purchases at Target and Target.com",
+      "Extended returns on Target purchases",
+      "Free shipping on many Target.com orders",
+      "No annual fee"
+    ],
+    "best_for": ["target", "groceries", "retail"]
+  },
+  {
+    "card_name": "Costco Anywhere Visa",
+    "issuer": "Citi",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.03, "groceries": 0.02, "gas": 0.04, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "4% cash back on eligible gas and EV charging (up to a cap)",
+      "3% cash back on restaurants and eligible travel",
+      "2% cash back on Costco and Costco.com purchases",
+      "1% cash back on all other purchases",
+      "Requires Costco membership"
+    ],
+    "best_for": ["gas", "travel", "costco"]
+  },
+  {
+    "card_name": "U.S. Bank Cash+",
+    "issuer": "U.S. Bank",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.01, "groceries": 0.02, "gas": 0.05, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% cash back in two chosen categories (like gas, streaming, etc.) up to a cap",
+      "2% cash back in one everyday category (like groceries, gas, or restaurants)",
+      "1% cash back on all other purchases",
+      "No annual fee"
+    ],
+    "best_for": ["custom_categories", "gas"]
+  },
+  {
+    "card_name": "U.S. Bank Altitude Reserve",
+    "issuer": "U.S. Bank",
+    "annual_fee": 400.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 3, "travel": 3, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "3x points on travel and mobile wallet purchases",
+      "$325 annual travel and dining credit",
+      "Priority Pass lounge access",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["travel", "mobile_wallet"]
+  },
+  {
+    "card_name": "Chase Southwest Rapid Rewards Plus",
+    "issuer": "Chase",
+    "annual_fee": 69.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 2, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "2x points on Southwest purchases",
+      "2x points on local transit, commuting, rideshares, and more",
+      "Bags fly free on Southwest (airline benefit)",
+      "Anniversary points each year (terms apply)"
+    ],
+    "best_for": ["airline", "southwest"]
+  },
+  {
+    "card_name": "Chase Southwest Rapid Rewards Priority",
+    "issuer": "Chase",
+    "annual_fee": 149.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 3, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "3x points on Southwest purchases",
+      "Boarding benefits and travel credits (Southwest)",
+      "Anniversary points each year (terms apply)",
+      "Bags fly free on Southwest (airline benefit)"
+    ],
+    "best_for": ["airline", "southwest"]
+  },
+  {
+    "card_name": "Delta SkyMiles Gold American Express",
+    "issuer": "American Express",
+    "annual_fee": 99.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 2, "groceries": 2, "gas": 2, "other": 1},
+    "benefits": [
+      "2x miles on Delta purchases",
+      "2x miles at restaurants worldwide and U.S. supermarkets",
+      "Free first checked bag on Delta flights",
+      "Priority boarding on Delta (terms apply)"
+    ],
+    "best_for": ["airline", "delta"]
+  },
+  {
+    "card_name": "Delta SkyMiles Platinum American Express",
+    "issuer": "American Express",
+    "annual_fee": 250.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 3, "groceries": 2, "gas": 2, "other": 1},
+    "benefits": [
+      "3x miles on Delta purchases",
+      "2x miles at restaurants and U.S. supermarkets",
+      "Annual companion certificate (terms apply)",
+      "Priority boarding and free checked bag on Delta"
+    ],
+    "best_for": ["airline", "delta"]
+  },
+  {
+    "card_name": "United Explorer Card",
+    "issuer": "Chase",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 2, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "2x miles on United purchases",
+      "2x miles at restaurants and eligible hotel stays",
+      "Free first checked bag on United flights",
+      "Priority boarding on United",
+      "2 United Club one-time passes each year"
+    ],
+    "best_for": ["airline", "united"]
+  },
+  {
+    "card_name": "United Quest Card",
+    "issuer": "Chase",
+    "annual_fee": 250.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 3, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "3x miles on United purchases",
+      "2x miles on travel, dining, and select streaming",
+      "Free checked bags and annual United travel credits",
+      "Priority boarding on United"
+    ],
+    "best_for": ["airline", "united"]
+  },
+  {
+    "card_name": "JetBlue Plus Card",
+    "issuer": "Barclays",
+    "annual_fee": 99.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 6, "groceries": 2, "gas": 1, "other": 1},
+    "benefits": [
+      "6x points on JetBlue purchases",
+      "2x points at restaurants and grocery stores",
+      "Free checked bag for you and companions on JetBlue",
+      "Annual points bonus (terms apply)"
+    ],
+    "best_for": ["airline", "jetblue"]
+  },
+  {
+    "card_name": "Hilton Honors Surpass American Express",
+    "issuer": "American Express",
+    "annual_fee": 150.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 6, "travel": 6, "groceries": 6, "gas": 6, "other": 3},
+    "benefits": [
+      "Up to 12x points on Hilton purchases (Hilton program)",
+      "6x points at U.S. restaurants, U.S. supermarkets, and U.S. gas stations",
+      "Hilton Honors Gold status",
+      "Free night reward with eligible spend (terms apply)"
+    ],
+    "best_for": ["hotel", "hilton"]
+  },
+  {
+    "card_name": "Marriott Bonvoy Boundless",
+    "issuer": "Chase",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 2, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "Up to 17x points on Marriott stays (program + card)",
+      "2x points on other travel purchases",
+      "Free night award each year (terms apply)",
+      "Automatic Silver Elite status"
+    ],
+    "best_for": ["hotel", "marriott"]
+  },
+  {
+    "card_name": "World of Hyatt Credit Card",
+    "issuer": "Chase",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 2, "groceries": 2, "gas": 2, "other": 1},
+    "benefits": [
+      "Up to 9x points at Hyatt hotels (program + card)",
+      "2x points at restaurants, airline tickets, local transit, and fitness clubs",
+      "Free night each year at eligible Hyatt category",
+      "Automatic Discoverist status"
+    ],
+    "best_for": ["hotel", "hyatt"]
+  },
+  {
+    "card_name": "Chase Ink Business Cash",
+    "issuer": "Chase",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.01, "travel": 0.01, "groceries": 0.01, "gas": 0.02, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% cash back on office supply stores and internet/cable/phone services (up to a cap)",
+      "2% cash back at gas stations and restaurants (up to a cap)",
+      "1% cash back on other purchases",
+      "No annual fee"
+    ],
+    "best_for": ["small_business", "office"]
+  },
+  {
+    "card_name": "Chase Ink Business Unlimited",
+    "issuer": "Chase",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.015, "travel": 0.015, "groceries": 0.015, "gas": 0.015, "other": 0.015},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "1.5% cash back on all business purchases",
+      "No annual fee"
+    ],
+    "best_for": ["small_business", "flat_cash_back"]
+  },
+  {
+    "card_name": "Capital One Spark Cash Plus",
+    "issuer": "Capital One",
+    "annual_fee": 150.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.02, "groceries": 0.02, "gas": 0.02, "other": 0.02},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "2% cash back on all purchases",
+      "Annual cash bonus with high annual spend (terms apply)",
+      "No preset spending limit (charge card style)"
+    ],
+    "best_for": ["small_business", "flat_cash_back"]
+  },
+  {
+    "card_name": "Bank of America Business Advantage Customized Cash",
+    "issuer": "Bank of America",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.03, "groceries": 0.03, "gas": 0.03, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "3% cash back in a chosen category (gas, online advertising, dining, etc.)",
+      "2% cash back on dining",
+      "1% cash back on all other purchases",
+      "No annual fee"
+    ],
+    "best_for": ["small_business", "custom_categories"]
+  },
+  {
+    "card_name": "Apple Card",
+    "issuer": "Goldman Sachs",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.02, "groceries": 0.02, "gas": 0.02, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "3% cash back at Apple and select partners",
+      "2% cash back on Apple Pay purchases",
+      "1% cash back on physical card purchases",
+      "No annual fee"
+    ],
+    "best_for": ["apple", "mobile_payments"]
+  },
+  {
+    "card_name": "Venmo Credit Card",
+    "issuer": "Synchrony",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.03, "groceries": 0.03, "gas": 0.03, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "3% cash back in your top spending category",
+      "2% cash back in your second highest category",
+      "1% cash back on all other purchases",
+      "Integrated with Venmo app",
+      "No annual fee"
+    ],
+    "best_for": ["cash_back", "venmo"]
+  },
+  {
+    "card_name": "PayPal Cashback Mastercard",
+    "issuer": "Synchrony",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.02, "groceries": 0.02, "gas": 0.02, "other": 0.02},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "2% cash back on all purchases",
+      "Cash back automatically goes to your PayPal account",
+      "No annual fee"
+    ],
+    "best_for": ["flat_cash_back", "paypal"]
+  },
+  {
+    "card_name": "Amazon Prime Visa",
+    "issuer": "Chase",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.02, "groceries": 0.03, "gas": 0.02, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% back at Amazon.com and Whole Foods Market for eligible Prime members",
+      "2% back at restaurants, gas stations, and transit",
+      "1% back on all other purchases",
+      "No foreign transaction fees"
+    ],
+    "best_for": ["amazon", "groceries", "online_shopping"]
+  },
+  {
+    "card_name": "Sam's Club Mastercard",
+    "issuer": "Synchrony",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.03, "travel": 0.03, "groceries": 0.02, "gas": 0.05, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "5% cash back on gas (up to a cap)",
+      "3% cash back on dining and travel",
+      "1% cash back on other purchases",
+      "Requires Sam's Club membership"
+    ],
+    "best_for": ["gas", "warehouse"]
+  },
+  {
+    "card_name": "BJ's Perks Elite Mastercard",
+    "issuer": "Comenity",
+    "annual_fee": 0.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.02, "groceries": 0.03, "gas": 0.10, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "10% back on most BJ's purchases (as rewards)",
+      "2% back on dining and non-BJ's gas",
+      "1% on other purchases",
+      "Requires BJ's membership"
+    ],
+    "best_for": ["warehouse", "groceries", "gas"]
+  },
+  {
+    "card_name": "Chase Disney Premier Visa",
+    "issuer": "Chase",
+    "annual_fee": 49.0,
+    "cash_back_rate": {"dining": 0.02, "travel": 0.02, "groceries": 0.02, "gas": 0.02, "other": 0.01},
+    "points_multiplier": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "benefits": [
+      "2% in Disney Rewards Dollars at gas stations, grocery stores, restaurants and most Disney locations",
+      "10% savings on select Disney purchases",
+      "Special Disney vacation financing offers"
+    ],
+    "best_for": ["disney", "entertainment"]
+  },
+  {
+    "card_name": "Chase IHG One Rewards Premier",
+    "issuer": "Chase",
+    "annual_fee": 99.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 2, "groceries": 2, "gas": 2, "other": 1},
+    "benefits": [
+      "High points earning on IHG stays",
+      "Free anniversary night (terms apply)",
+      "Platinum Elite status as long as you hold the card"
+    ],
+    "best_for": ["hotel", "ihg"]
+  },
+  {
+    "card_name": "Chase British Airways Visa",
+    "issuer": "Chase",
+    "annual_fee": 95.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 3, "travel": 3, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "3x Avios on British Airways, Iberia, and Aer Lingus purchases",
+      "2x Avios on hotel accommodations",
+      "Travel Together ticket benefit with high spend (terms apply)"
+    ],
+    "best_for": ["airline", "british_airways"]
+  },
+  {
+    "card_name": "Barclays AAdvantage Aviator Red",
+    "issuer": "Barclays",
+    "annual_fee": 99.0,
+    "cash_back_rate": {"dining": 0, "travel": 0, "groceries": 0, "gas": 0, "other": 0},
+    "points_multiplier": {"dining": 2, "travel": 2, "groceries": 1, "gas": 1, "other": 1},
+    "benefits": [
+      "2x miles on eligible American Airlines purchases",
+      "1x miles on all other purchases",
+      "First checked bag free on domestic American Airlines itineraries",
+      "Preferred boarding on American flights"
+    ],
+    "best_for": ["airline", "american_airlines"]
+  }
+]
