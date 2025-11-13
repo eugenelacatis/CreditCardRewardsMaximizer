@@ -28,7 +28,8 @@ from crud import (
     get_user_transactions, get_recent_transactions,
     calculate_transaction_stats, create_transaction_feedback,
     get_user_behavior, update_user_behavior, create_automation_rule,
-    get_user_automation_rules, get_or_create_merchant, create_credit_card, update_card, deactivate_card, get_card
+    get_user_automation_rules, get_or_create_merchant, create_credit_card, update_card, deactivate_card, get_card,
+    get_user_analytics
 )
 from models import (
     User as UserModel, CreditCard as CreditCardModel,
@@ -359,6 +360,49 @@ async def get_user_statistics(user_id: str, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/users/{user_id}/analytics")
+async def get_user_analytics_endpoint(
+    user_id: str,
+    days: int = 30,
+    db: Session = Depends(get_db)
+):
+    """
+    Get comprehensive analytics for a user
+    
+    Returns detailed insights including:
+    - Total savings and rewards over time period
+    - Best performing credit card
+    - Category-wise spending breakdown
+    - Weekly trends
+    - Top merchants
+    - Optimization insights and recommendations
+    
+    Args:
+        user_id: User's unique identifier
+        days: Number of days to analyze (default: 30, max: 365)
+    """
+    try:
+        user = get_user(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Validate days parameter
+        if days < 1 or days > 365:
+            raise HTTPException(
+                status_code=400,
+                detail="Days parameter must be between 1 and 365"
+            )
+        
+        analytics = get_user_analytics(db, user_id, days=days)
+        return analytics
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting analytics for user {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
