@@ -87,9 +87,9 @@ class Category(str, Enum):
 class TransactionRequest(BaseModel):
     user_id: str
     merchant: str
-    amount: float = Field(gt=0)
-    category: Category
-    optimization_goal: OptimizationGoal
+    amount: Optional[float] = Field(default=None, gt=0)
+    category: Optional[Category] = None
+    optimization_goal: Optional[OptimizationGoal] = None
     location: Optional[str] = None
     timestamp: Optional[datetime] = None
 
@@ -124,6 +124,17 @@ class RecommendationResponse(BaseModel):
     alternative_cards: List[CardRecommendation]
     optimization_summary: str
     total_savings: float
+
+
+class RecommendedCardSimple(BaseModel):
+    card_name: str
+    reason: str
+    estimated_value: str
+
+
+class SimpleRecommendationResponse(BaseModel):
+    recommended_card: RecommendedCardSimple
+    alternatives: List[RecommendedCardSimple] = Field(default_factory=list)
 
 
 class UserStats(BaseModel):
@@ -327,7 +338,7 @@ async def signin(request: SigninRequest, db: Session = Depends(get_db)):
         )
 
 
-@app.post("/api/v1/recommend", response_model=RecommendationResponse)
+@app.post("/api/v1/recommend", response_model=SimpleRecommendationResponse)
 async def get_card_recommendation(
     request: TransactionRequest,
     db: Session = Depends(get_db)
@@ -361,12 +372,22 @@ async def get_card_recommendation(
             for card in user_cards
         ]
         
-        # Prepare transaction data for AI
+        # Prepare transaction data for AI with sensible defaults
+        amount = request.amount or 0.0
+        category_value = (
+            request.category.value if request.category else Category.OTHER.value
+        )
+        goal_value = (
+            request.optimization_goal.value
+            if request.optimization_goal
+            else OptimizationGoal.BALANCED.value
+        )
+
         transaction_data = {
             "merchant": request.merchant,
-            "amount": request.amount,
-            "category": request.category,
-            "optimization_goal": request.optimization_goal
+            "amount": amount,
+            "category": category_value,
+            "optimization_goal": goal_value
         }
         
         # Get AI recommendation - will raise RuntimeError if Groq unavailable
@@ -383,36 +404,43 @@ async def get_card_recommendation(
                 detail=f"AI recommendation service unavailable: {str(e)}"
             )
         
-        # Store transaction in database
-        recommended_card_id = result["recommended_card"]["card_id"]
-        transaction = create_transaction(
-            db,
-            user_id=request.user_id,
-            merchant=request.merchant,
-            amount=request.amount,
-            category=CategoryEnum(request.category),
-            optimization_goal=OptimizationGoalEnum(request.optimization_goal),
-            recommended_card_id=recommended_card_id,
-            location=request.location,
-            recommendation_explanation=result["recommended_card"]["explanation"],
-            confidence_score=result["recommended_card"]["confidence_score"],
-            alternative_cards=[
-                {
-                    "card_id": alt["card_id"],
-                    "expected_value": alt["expected_value"]
-                }
-                for alt in result["alternative_cards"]
-            ],
-            cash_back_earned=result["recommended_card"]["cash_back_earned"],
-            points_earned=result["recommended_card"]["points_earned"],
-            total_value_earned=result["recommended_card"]["expected_value"],
-            optimal_value=result["recommended_card"]["expected_value"]
+        # Map detailed AI result to simplified response shape
+        def summarize_card(card_dict: Dict, txn_amount: float, category: str) -> RecommendedCardSimple:
+            reason = card_dict.get("explanation", "")
+
+            if txn_amount and txn_amount > 0:
+                points_earned = float(card_dict.get("points_earned", 0) or 0)
+                cash_back_earned = float(card_dict.get("cash_back_earned", 0) or 0)
+
+                if points_earned > 0:
+                    points_per_dollar = points_earned / txn_amount
+                    estimated_value = f"{points_per_dollar:.1f} points per $1"
+                elif cash_back_earned > 0:
+                    cash_back_rate = cash_back_earned / txn_amount
+                    estimated_value = f"{cash_back_rate * 100:.1f}% cash back"
+                else:
+                    estimated_value = f"Optimized for {category}"
+            else:
+                estimated_value = f"Optimized for {category}"
+
+            return RecommendedCardSimple(
+                card_name=card_dict["card_name"],
+                reason=reason,
+                estimated_value=estimated_value,
+            )
+
+        best_card = result["recommended_card"]
+        alternative_cards = result.get("alternative_cards", [])
+
+        simple_best = summarize_card(best_card, amount, category_value)
+        simple_alternatives = [
+            summarize_card(alt, amount, category_value) for alt in alternative_cards
+        ]
+
+        return SimpleRecommendationResponse(
+            recommended_card=simple_best,
+            alternatives=simple_alternatives,
         )
-        
-        # Get or create merchant
-        get_or_create_merchant(db, request.merchant, CategoryEnum(request.category))
-        
-        return RecommendationResponse(**result)
         
     except HTTPException:
         raise
