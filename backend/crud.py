@@ -24,6 +24,7 @@ def create_user(
     db: Session,
     email: str,
     full_name: str,
+    password_hash: str,
     phone: Optional[str] = None,
     default_optimization_goal: OptimizationGoalEnum = OptimizationGoalEnum.BALANCED
 ) -> User:
@@ -31,6 +32,7 @@ def create_user(
     user = User(
         user_id=f"user_{uuid.uuid4().hex[:12]}",
         email=email,
+        password_hash=password_hash,
         full_name=full_name,
         phone=phone,
         default_optimization_goal=default_optimization_goal
@@ -38,10 +40,10 @@ def create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
-    
+
     # Initialize user behavior
     create_user_behavior(db, user.user_id)
-    
+
     return user
 
 
@@ -574,3 +576,192 @@ def get_latest_ai_metrics(
     if model_version:
         query = query.filter(AIModelMetrics.model_version == model_version)
     return query.order_by(desc(AIModelMetrics.metric_date)).first()
+
+
+# ============================================================================
+# ANALYTICS OPERATIONS
+# ============================================================================
+
+def get_user_analytics(
+    db: Session,
+    user_id: str,
+    days: int = 30
+) -> Dict:
+    """
+    Get comprehensive analytics for a user including:
+    - Total savings and rewards
+    - Best performing card
+    - Category breakdown
+    - Monthly trends
+    - Optimization insights
+    """
+    # Get date range
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # Get all transactions in period
+    transactions = db.query(Transaction).filter(
+        and_(
+            Transaction.user_id == user_id,
+            Transaction.transaction_date >= start_date,
+            Transaction.transaction_date <= end_date
+        )
+    ).all()
+    
+    # Get user's cards
+    cards = get_user_cards(db, user_id, active_only=True)
+    
+    # Calculate basic stats
+    total_transactions = len(transactions)
+    total_spent = sum(t.amount for t in transactions)
+    total_rewards = sum(t.total_value_earned or 0 for t in transactions)
+    total_potential = sum(t.optimal_value or 0 for t in transactions)
+    missed_value = sum(t.missed_value or 0 for t in transactions)
+    
+    # Calculate best performing card
+    card_performance = {}
+    for txn in transactions:
+        if txn.recommended_card_id:
+            card_id = txn.recommended_card_id
+            if card_id not in card_performance:
+                card_performance[card_id] = {
+                    'total_value': 0,
+                    'transaction_count': 0,
+                    'total_spent': 0
+                }
+            card_performance[card_id]['total_value'] += txn.total_value_earned or 0
+            card_performance[card_id]['transaction_count'] += 1
+            card_performance[card_id]['total_spent'] += txn.amount
+    
+    best_card = None
+    best_card_value = 0
+    if card_performance:
+        best_card_id = max(card_performance, key=lambda k: card_performance[k]['total_value'])
+        best_card_data = card_performance[best_card_id]
+        best_card_obj = get_card(db, best_card_id)
+        if best_card_obj:
+            best_card = {
+                'card_id': best_card_id,
+                'card_name': best_card_obj.card_name,
+                'total_value': round(best_card_data['total_value'], 2),
+                'transaction_count': best_card_data['transaction_count'],
+                'avg_value_per_transaction': round(
+                    best_card_data['total_value'] / best_card_data['transaction_count'], 2
+                )
+            }
+            best_card_value = best_card_data['total_value']
+    
+    # Category breakdown
+    category_breakdown = {}
+    for txn in transactions:
+        category = txn.category.value if txn.category else 'other'
+        if category not in category_breakdown:
+            category_breakdown[category] = {
+                'count': 0,
+                'total_spent': 0,
+                'total_rewards': 0
+            }
+        category_breakdown[category]['count'] += 1
+        category_breakdown[category]['total_spent'] += txn.amount
+        category_breakdown[category]['total_rewards'] += txn.total_value_earned or 0
+    
+    # Sort categories by spending
+    category_breakdown = dict(
+        sorted(
+            category_breakdown.items(),
+            key=lambda x: x[1]['total_spent'],
+            reverse=True
+        )
+    )
+    
+    # Monthly trend (group by week for 30-day period)
+    weekly_trends = []
+    current_week_start = start_date
+    while current_week_start < end_date:
+        week_end = min(current_week_start + timedelta(days=7), end_date)
+        week_txns = [
+            t for t in transactions
+            if current_week_start <= t.transaction_date < week_end
+        ]
+        weekly_trends.append({
+            'week_start': current_week_start.isoformat(),
+            'week_end': week_end.isoformat(),
+            'transaction_count': len(week_txns),
+            'total_spent': round(sum(t.amount for t in week_txns), 2),
+            'total_rewards': round(sum(t.total_value_earned or 0 for t in week_txns), 2)
+        })
+        current_week_start = week_end
+    
+    # Optimization insights
+    followed_recommendations = sum(1 for t in transactions if t.used_recommended_card)
+    optimization_rate = (followed_recommendations / total_transactions * 100) if total_transactions > 0 else 0
+    
+    # Calculate potential additional savings if user followed all recommendations
+    potential_additional_savings = missed_value
+    
+    # Top merchants
+    merchant_spending = {}
+    for txn in transactions:
+        merchant = txn.merchant
+        if merchant not in merchant_spending:
+            merchant_spending[merchant] = {
+                'count': 0,
+                'total_spent': 0,
+                'total_rewards': 0
+            }
+        merchant_spending[merchant]['count'] += 1
+        merchant_spending[merchant]['total_spent'] += txn.amount
+        merchant_spending[merchant]['total_rewards'] += txn.total_value_earned or 0
+    
+    top_merchants = sorted(
+        merchant_spending.items(),
+        key=lambda x: x[1]['total_spent'],
+        reverse=True
+    )[:5]
+    
+    return {
+        'period': {
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'days': days
+        },
+        'summary': {
+            'total_transactions': total_transactions,
+            'total_spent': round(total_spent, 2),
+            'total_rewards_earned': round(total_rewards, 2),
+            'total_potential_rewards': round(total_potential, 2),
+            'missed_value': round(missed_value, 2),
+            'optimization_rate': round(optimization_rate, 2),
+            'avg_transaction_amount': round(total_spent / total_transactions, 2) if total_transactions > 0 else 0,
+            'avg_rewards_per_transaction': round(total_rewards / total_transactions, 2) if total_transactions > 0 else 0
+        },
+        'best_card': best_card,
+        'category_breakdown': {
+            cat: {
+                'count': data['count'],
+                'total_spent': round(data['total_spent'], 2),
+                'total_rewards': round(data['total_rewards'], 2),
+                'avg_rewards_rate': round(
+                    (data['total_rewards'] / data['total_spent'] * 100) if data['total_spent'] > 0 else 0,
+                    2
+                )
+            }
+            for cat, data in category_breakdown.items()
+        },
+        'weekly_trends': weekly_trends,
+        'top_merchants': [
+            {
+                'merchant': merchant,
+                'transaction_count': data['count'],
+                'total_spent': round(data['total_spent'], 2),
+                'total_rewards': round(data['total_rewards'], 2)
+            }
+            for merchant, data in top_merchants
+        ],
+        'insights': {
+            'potential_additional_savings': round(potential_additional_savings, 2),
+            'recommendation_follow_rate': round(optimization_rate, 2),
+            'total_cards_owned': len(cards),
+            'best_performing_card': best_card['card_name'] if best_card else None
+        }
+    }

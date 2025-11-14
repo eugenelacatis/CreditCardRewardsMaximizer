@@ -6,26 +6,108 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import API from '../services/api';
 
 // The 'onLogin' prop is passed down from App.js
 export default function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [isSignupMode, setIsSignupMode] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // We call the onLogin function passed from App.js to change the state
-  const handleLoginPress = () => {
-    // In a real app, you would validate email/password here
-    onLogin();
+  const handleLoginPress = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await API.signin({
+        email: email.trim(),
+        password: password
+      });
+
+      // Store user data
+      await AsyncStorage.setItem('userId', response.data.user_id);
+      await AsyncStorage.setItem('userEmail', response.data.email);
+      await AsyncStorage.setItem('userFullName', response.data.full_name);
+
+      console.log('✅ Login successful, user ID:', response.data.user_id);
+
+      // Call onLogin with user data
+      onLogin(response.data.user_id);
+
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert(
+        'Login Failed',
+        error.message || 'Invalid email or password. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSignupPress = () => {
-    // In a real app, this would navigate to a different form
-    // or perform a registration API call
-    onLogin(); // For this demo, signup also logs in
+  const handleSignupPress = async () => {
+    if (!email || !password || !fullName) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await API.signup({
+        email: email.trim(),
+        password: password,
+        full_name: fullName.trim()
+      });
+
+      // Store user data
+      await AsyncStorage.setItem('userId', response.data.user_id);
+      await AsyncStorage.setItem('userEmail', response.data.email);
+      await AsyncStorage.setItem('userFullName', response.data.full_name);
+
+      console.log('✅ Signup successful, user ID:', response.data.user_id);
+
+      Alert.alert(
+        'Success',
+        'Account created successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => onLogin(response.data.user_id)
+          }
+        ]
+      );
+
+    } catch (error) {
+      console.error('Signup error:', error);
+      Alert.alert(
+        'Signup Failed',
+        error.message || 'Could not create account. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleMode = () => {
+    setIsSignupMode(!isSignupMode);
+    setFullName('');
   };
 
   return (
@@ -35,12 +117,25 @@ export default function LoginScreen({ onLogin }) {
         style={styles.content}
       >
         <View style={styles.header}>
-          <Icon name="wallet-agentic" size={60} color="#4A90E2" />
+          <Icon name="wallet" size={60} color="#4A90E2" />
           <Text style={styles.title}>Agentic Wallet</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+          <Text style={styles.subtitle}>
+            {isSignupMode ? 'Create your account' : 'Sign in to continue'}
+          </Text>
         </View>
 
         <View style={styles.form}>
+          {isSignupMode && (
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              placeholderTextColor="#888"
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+              editable={!loading}
+            />
+          )}
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -49,6 +144,7 @@ export default function LoginScreen({ onLogin }) {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!loading}
           />
           <TextInput
             style={styles.input}
@@ -57,17 +153,32 @@ export default function LoginScreen({ onLogin }) {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            editable={!loading}
           />
 
-          <TouchableOpacity style={styles.button} onPress={handleLoginPress}>
-            <Text style={styles.buttonText}>Login</Text>
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={isSignupMode ? handleSignupPress : handleLoginPress}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {isSignupMode ? 'Sign Up' : 'Login'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account?</Text>
-          <TouchableOpacity onPress={handleSignupPress}>
-            <Text style={styles.signupText}>Sign Up</Text>
+          <Text style={styles.footerText}>
+            {isSignupMode ? 'Already have an account?' : "Don't have an account?"}
+          </Text>
+          <TouchableOpacity onPress={toggleMode} disabled={loading}>
+            <Text style={styles.signupText}>
+              {isSignupMode ? 'Sign In' : 'Sign Up'}
+            </Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -121,6 +232,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
+  },
+  buttonDisabled: {
+    backgroundColor: '#A0A0A0',
   },
   buttonText: {
     color: '#fff',

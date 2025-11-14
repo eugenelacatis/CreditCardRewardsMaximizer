@@ -6,6 +6,7 @@ Combined init + seed for Docker startup
 from database import db
 from crud import create_user, create_credit_card
 from models import Base, OptimizationGoalEnum, CardIssuerEnum
+from auth import hash_password
 
 
 def init_and_seed_database():
@@ -33,11 +34,13 @@ def init_and_seed_database():
             session,
             email="test@example.com",
             full_name="Test User",
+            password_hash=hash_password("password123"),  # Default test password
             phone="+1234567890",
             default_optimization_goal=OptimizationGoalEnum.CASH_BACK
         )
         print(f"   ✅ Created user: {user.email}")
         print(f"   🔑 USER_ID: {user.user_id}")
+        print(f"   🔐 Default Password: password123")
         
         # Create test credit cards
         print(f"\n💳 Creating credit cards...")

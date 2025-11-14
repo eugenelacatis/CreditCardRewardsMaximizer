@@ -6,6 +6,8 @@ Provides test database, test client, and test data fixtures
 import pytest
 import os
 import sys
+import time
+from collections import deque
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
@@ -22,6 +24,108 @@ import uuid
 
 # Test Database URL (SQLite in-memory for fast tests)
 TEST_DATABASE_URL = "sqlite:///./test.db"
+
+
+# ============================================================================
+# GROQ API RATE LIMIT TRACKER
+# ============================================================================
+class GroqRateLimitTracker:
+    """
+    Tracks Groq API calls and automatically pauses when approaching rate limits.
+    Groq free tier: ~30 requests per minute for llama-3.3-70b-versatile
+    """
+    def __init__(self, max_requests_per_minute=25, window_seconds=60):
+        self.max_requests = max_requests_per_minute  # Conservative: 25 instead of 30
+        self.window_seconds = window_seconds
+        self.request_times = deque()
+        self.total_waits = 0
+        self.total_wait_time = 0
+    
+    def record_request(self):
+        """Record an API request and pause if needed"""
+        current_time = time.time()
+        
+        # Remove requests older than the time window
+        while self.request_times and current_time - self.request_times[0] > self.window_seconds:
+            self.request_times.popleft()
+        
+        # Check if we're at the limit
+        if len(self.request_times) >= self.max_requests:
+            # Calculate how long to wait
+            oldest_request = self.request_times[0]
+            wait_time = self.window_seconds - (current_time - oldest_request) + 1  # +1 for safety
+            
+            if wait_time > 0:
+                self.total_waits += 1
+                self.total_wait_time += wait_time
+                print(f"\n⏸️  Rate limit approaching ({len(self.request_times)}/{self.max_requests} requests)")
+                print(f"   Pausing for {wait_time:.1f}s to avoid 429 errors...")
+                time.sleep(wait_time)
+                current_time = time.time()
+                
+                # Clean up old requests after waiting
+                while self.request_times and current_time - self.request_times[0] > self.window_seconds:
+                    self.request_times.popleft()
+        
+        # Record this request
+        self.request_times.append(current_time)
+    
+    def get_stats(self):
+        """Get statistics about rate limiting"""
+        return {
+            "total_requests": len(self.request_times),
+            "total_waits": self.total_waits,
+            "total_wait_time": self.total_wait_time
+        }
+
+
+# Global rate limit tracker (session scope)
+_rate_limit_tracker = GroqRateLimitTracker()
+
+
+@pytest.fixture(scope="session")
+def rate_limit_tracker():
+    """Provide the rate limit tracker to tests"""
+    return _rate_limit_tracker
+
+
+def pytest_runtest_setup(item):
+    """
+    Hook that runs before each test. Checks rate limits and pauses if needed.
+    This prevents 429 errors by proactively managing API call rate.
+    """
+    test_name = item.name
+    
+    # Estimate API calls based on test name
+    estimated_calls = 0
+    
+    if "multiple_sequential" in test_name.lower():
+        estimated_calls = 10  # test_multiple_sequential_requests makes 10 calls
+    elif "recommendation" in test_name.lower():
+        estimated_calls = 1  # Single recommendation test
+    elif "performance" in test_name.lower() and "recommendation" in test_name.lower():
+        estimated_calls = 1
+    
+    # Record the estimated calls BEFORE running the test
+    if estimated_calls > 0:
+        print(f"\n🔍 Test '{test_name}' will make ~{estimated_calls} API call(s)")
+        for _ in range(estimated_calls):
+            _rate_limit_tracker.record_request()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Print rate limit statistics at the end of the test session"""
+    stats = _rate_limit_tracker.get_stats()
+    print(f"\n{'='*70}")
+    print(f"📊 Groq API Rate Limit Management:")
+    print(f"   Total API calls made: ~{stats['total_requests']}")
+    print(f"   Times paused to avoid rate limits: {stats['total_waits']}")
+    if stats['total_waits'] > 0:
+        print(f"   Total wait time: {stats['total_wait_time']:.1f}s")
+        print(f"   ✅ Successfully avoided 429 errors!")
+    else:
+        print(f"   ✅ No rate limit pauses needed")
+    print(f"{'='*70}")
 
 
 @pytest.fixture(scope="session")

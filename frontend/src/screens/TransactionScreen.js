@@ -192,58 +192,27 @@ export default function TransactionScreen() {
                 <Text style={styles.cardName}>{card.card_name}</Text>
 
                 <View style={styles.valueBox}>
-                  <Text style={styles.valueLabel}>Expected Value</Text>
+                  <Text style={styles.valueLabel}>Estimated Value</Text>
                   <Text style={styles.valueAmount}>
-                    ${card.expected_value.toFixed(2)}
+                    {card.estimated_value}
                   </Text>
                 </View>
 
-                <View style={styles.rewardsRow}>
-                  <View style={styles.rewardItem}>
-                    <Text style={styles.rewardEmoji}>💵</Text>
-                    <Text style={styles.rewardLabel}>Cash Back</Text>
-                    <Text style={styles.rewardValue}>
-                      ${card.cash_back_earned.toFixed(2)}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.rewardDivider} />
-                  
-                  <View style={styles.rewardItem}>
-                    <Text style={styles.rewardEmoji}>⭐</Text>
-                    <Text style={styles.rewardLabel}>Points</Text>
-                    <Text style={styles.rewardValue}>
-                      {card.points_earned.toFixed(0)}
-                    </Text>
-                  </View>
-                </View>
-
                 <View style={styles.explanationBox}>
-                  <Text style={styles.explanationText}>{card.explanation}</Text>
+                  <Text style={styles.explanationText}>{card.reason}</Text>
                 </View>
-
-                {card.applicable_benefits && card.applicable_benefits.length > 0 && (
-                  <View style={styles.benefitsBox}>
-                    <Text style={styles.benefitsTitle}>✨ Extra Benefits</Text>
-                    {card.applicable_benefits.map((benefit, idx) => (
-                      <Text key={idx} style={styles.benefitItem}>
-                        • {benefit}
-                      </Text>
-                    ))}
-                  </View>
-                )}
               </View>
 
               {/* Alternative Cards */}
-              {recommendation.alternative_cards && recommendation.alternative_cards.length > 0 && (
+              {recommendation.alternatives && recommendation.alternatives.length > 0 && (
                 <View style={styles.alternativesSection}>
                   <Text style={styles.alternativesTitle}>Other Options</Text>
-                  {recommendation.alternative_cards.slice(0, 2).map((altCard, idx) => (
+                  {recommendation.alternatives.slice(0, 2).map((altCard, idx) => (
                     <View key={idx} style={styles.alternativeCard}>
                       <View>
                         <Text style={styles.alternativeCardName}>{altCard.card_name}</Text>
                         <Text style={styles.alternativeCardValue}>
-                          Value: ${altCard.expected_value.toFixed(2)}
+                          {altCard.estimated_value}
                         </Text>
                       </View>
                     </View>

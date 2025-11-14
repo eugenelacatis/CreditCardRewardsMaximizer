@@ -5,8 +5,10 @@ from langchain.chains import LLMChain
 import os
 import json
 import logging
+import time
 from typing import Dict, List, Optional, Tuple
 from models import OptimizationGoalEnum, CategoryEnum
+from groq import RateLimitError
 
 # Configure logging
 log_dir = os.path.join(os.path.dirname(__file__), 'logs')
@@ -22,6 +24,85 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+class RateLimitHandler:
+    """
+    Intelligent rate limit handler for Groq API.
+    Differentiates between recoverable and non-recoverable rate limits.
+    """
+    
+    @staticmethod
+    def parse_rate_limit_error(error_message: str) -> Dict:
+        """
+        Parse Groq rate limit error to determine type and wait time.
+        
+        Returns:
+            Dict with keys: 'type', 'is_recoverable', 'wait_seconds', 'message'
+        """
+        error_lower = error_message.lower()
+        
+        # Check for daily token limit (non-recoverable)
+        if 'tokens per day' in error_lower or 'tpd' in error_lower:
+            return {
+                'type': 'daily_token_limit',
+                'is_recoverable': False,
+                'wait_seconds': None,
+                'message': 'Daily token limit reached. Service unavailable until reset.'
+            }
+        
+        # Check for requests per minute (recoverable)
+        if 'requests per minute' in error_lower or 'rpm' in error_lower:
+            # Try to extract wait time from error message
+            wait_seconds = 60  # Default to 60 seconds
+            
+            # Look for "try again in Xm Ys" pattern
+            import re
+            time_match = re.search(r'try again in (\d+)m(\d+)', error_message)
+            if time_match:
+                minutes = int(time_match.group(1))
+                seconds = int(time_match.group(2).split('.')[0])
+                wait_seconds = minutes * 60 + seconds
+            
+            return {
+                'type': 'requests_per_minute',
+                'is_recoverable': True,
+                'wait_seconds': wait_seconds,
+                'message': f'Rate limit: too many requests. Retrying in {wait_seconds}s.'
+            }
+        
+        # Unknown rate limit type - treat as recoverable with short wait
+        return {
+            'type': 'unknown',
+            'is_recoverable': True,
+            'wait_seconds': 30,
+            'message': 'Rate limit encountered. Retrying in 30s.'
+        }
+    
+    @staticmethod
+    def should_retry(error_info: Dict, attempt: int, max_retries: int = 3) -> bool:
+        """
+        Determine if we should retry based on error type and attempt count.
+        """
+        if not error_info['is_recoverable']:
+            return False
+        
+        if attempt >= max_retries:
+            return False
+        
+        return True
+    
+    @staticmethod
+    def wait_with_backoff(error_info: Dict, attempt: int):
+        """
+        Wait with exponential backoff for recoverable errors.
+        """
+        base_wait = error_info.get('wait_seconds', 60)
+        # Exponential backoff: base_wait * (1.5 ^ attempt)
+        wait_time = base_wait * (1.5 ** attempt)
+        
+        logger.warning(f"Rate limit hit (attempt {attempt + 1}). Waiting {wait_time:.1f}s...")
+        time.sleep(wait_time)
 
 class AgenticRecommendationSystem:
     """
@@ -45,12 +126,12 @@ class AgenticRecommendationSystem:
                 )
                 print("✓ Groq AI initialized successfully")
             except Exception as e:
-                print(f"⚠ Warning: Could not initialize Groq AI: {e}")
-                print("  Falling back to rule-based recommendations")
+                print(f"❌ ERROR: Could not initialize Groq AI: {e}")
+                print("  Service will not be available until this is resolved")
                 self.llm = None
         else:
-            print("⚠ Warning: GROQ_API_KEY not found in environment")
-            print("  Using rule-based recommendations instead of AI")
+            print("❌ ERROR: GROQ_API_KEY not found in environment")
+            print("  Service will not be available until API key is configured")
         
         # Only create prompt and chain if LLM is available
         self.recommendation_prompt = None
@@ -260,10 +341,10 @@ Card: {card['card_name']} ({card['issuer']})
         card_scores.sort(key=lambda x: x['value'], reverse=True)
         logger.info(f"Top card by calculation: {card_scores[0]['card']['card_name']} (${card_scores[0]['value']:.2f})")
         
-        # If no LLM available, use fallback with calculated scores
+        # If no LLM available, raise error - NO FALLBACK
         if not self.llm:
-            logger.info("Using rule-based fallback (no AI available)")
-            return self._fallback_recommendation_with_scores(transaction_data, card_scores)
+            logger.error("Groq AI not available - cannot provide recommendations")
+            raise RuntimeError("AI service unavailable. Please ensure GROQ_API_KEY is configured and the service is operational.")
         
         # Get top 3 cards for AI analysis
         top_cards = card_scores[:3]
@@ -284,56 +365,112 @@ Rank #{i}: {card['card_name']} ({card['issuer']})
         
         cards_info = "\n".join(cards_info_with_scores)
         
-        # Get LLM recommendation (AI explains WHY top card is best)
-        try:
-            logger.info("Requesting AI explanation for top recommendation")
-            result = self.recommendation_chain.invoke({
-                "merchant": transaction_data['merchant'],
-                "amount": transaction_data['amount'],
-                "category": transaction_data['category'],
-                "goal": transaction_data['optimization_goal'],
-                "cards_info": cards_info
-            })
+        # Get LLM recommendation with intelligent retry logic
+        logger.info("Requesting AI explanation for top recommendation")
+        result = self._invoke_llm_with_retry({
+            "merchant": transaction_data['merchant'],
+            "amount": transaction_data['amount'],
+            "category": transaction_data['category'],
+            "goal": transaction_data['optimization_goal'],
+            "cards_info": cards_info
+        })
+        
+        # Use top card from calculation (AI just provides explanation)
+        best_card_data = card_scores[0]
+        best_card = best_card_data['card']
+        best_breakdown = best_card_data['breakdown']
+        
+        # Parse AI explanation
+        response_text = result['text']
+        ai_explanation = response_text.strip()
+        
+        # Build enhanced explanation with comparisons
+        enhanced_explanation = self._build_enhanced_explanation(
+            card_scores[:3],  # Top 3 cards
+            transaction_data,
+            ai_explanation
+        )
+        
+        logger.info(f"Recommendation complete: {best_card['card_name']} - ${best_card_data['value']:.2f}")
+        
+        # Build final response
+        return {
+            "recommended_card": {
+                "card_id": best_card['card_id'],
+                "card_name": best_card['card_name'],
+                "expected_value": round(best_card_data['value'], 2),
+                "cash_back_earned": round(best_breakdown['cash_back'], 2),
+                "points_earned": round(best_breakdown['points'], 2),
+                "applicable_benefits": best_card.get('benefits', [])[:2],
+                "explanation": enhanced_explanation,
+                "confidence_score": 0.95  # Higher confidence with calculation
+            },
+            "alternative_cards": self._build_alternatives_from_scores(card_scores[1:3]),
+            "optimization_summary": f"Best choice for {transaction_data['optimization_goal'].replace('_', ' ')}: {best_card['card_name']} (${best_card_data['value']:.2f} value)",
+            "total_savings": round(best_card_data['value'], 2)
+        }
+    
+    def _invoke_llm_with_retry(self, input_data: Dict, max_retries: int = 3) -> Dict:
+        """
+        Invoke LLM with intelligent retry logic for rate limits.
+        
+        Args:
+            input_data: Input data for the LLM chain
+            max_retries: Maximum number of retry attempts (default: 3)
             
-            # Use top card from calculation (AI just provides explanation)
-            best_card_data = card_scores[0]
-            best_card = best_card_data['card']
-            best_breakdown = best_card_data['breakdown']
+        Returns:
+            LLM response dictionary
             
-            # Parse AI explanation
-            response_text = result['text']
-            ai_explanation = response_text.strip()
-            
-            # Build enhanced explanation with comparisons
-            enhanced_explanation = self._build_enhanced_explanation(
-                card_scores[:3],  # Top 3 cards
-                transaction_data,
-                ai_explanation
-            )
-            
-            logger.info(f"Recommendation complete: {best_card['card_name']} - ${best_card_data['value']:.2f}")
-            
-            # Build final response
-            return {
-                "recommended_card": {
-                    "card_id": best_card['card_id'],
-                    "card_name": best_card['card_name'],
-                    "expected_value": round(best_card_data['value'], 2),
-                    "cash_back_earned": round(best_breakdown['cash_back'], 2),
-                    "points_earned": round(best_breakdown['points'], 2),
-                    "applicable_benefits": best_card.get('benefits', [])[:2],
-                    "explanation": enhanced_explanation,
-                    "confidence_score": 0.95  # Higher confidence with calculation
-                },
-                "alternative_cards": self._build_alternatives_from_scores(card_scores[1:3]),
-                "optimization_summary": f"Best choice for {transaction_data['optimization_goal'].replace('_', ' ')}: {best_card['card_name']} (${best_card_data['value']:.2f} value)",
-                "total_savings": round(best_card_data['value'], 2)
-            }
-            
-        except Exception as e:
-            logger.error(f"Agentic AI Error: {e}", exc_info=True)
-            # Fallback to rule-based if AI fails
-            return self._fallback_recommendation_with_scores(transaction_data, card_scores)
+        Raises:
+            RuntimeError: For non-recoverable errors or max retries exceeded
+        """
+        rate_limit_handler = RateLimitHandler()
+        
+        for attempt in range(max_retries + 1):
+            try:
+                result = self.recommendation_chain.invoke(input_data)
+                
+                # Success - log if this was a retry
+                if attempt > 0:
+                    logger.info(f"Successfully recovered after {attempt} retry attempt(s)")
+                
+                return result
+                
+            except RateLimitError as e:
+                error_message = str(e)
+                logger.warning(f"Rate limit error on attempt {attempt + 1}: {error_message}")
+                
+                # Parse the error to determine if recoverable
+                error_info = rate_limit_handler.parse_rate_limit_error(error_message)
+                
+                # Check if we should retry
+                if not rate_limit_handler.should_retry(error_info, attempt, max_retries):
+                    if not error_info['is_recoverable']:
+                        # Non-recoverable error (daily token limit)
+                        logger.error(f"Non-recoverable rate limit: {error_info['message']}")
+                        raise RuntimeError(
+                            f"AI service unavailable: {error_info['message']} "
+                            "Please try again later or contact support."
+                        )
+                    else:
+                        # Max retries exceeded
+                        logger.error(f"Max retries ({max_retries}) exceeded for rate limit")
+                        raise RuntimeError(
+                            f"AI service temporarily unavailable after {max_retries} retry attempts. "
+                            "Please try again in a few minutes."
+                        )
+                
+                # Recoverable error - wait and retry
+                logger.info(f"Recoverable rate limit: {error_info['message']}")
+                rate_limit_handler.wait_with_backoff(error_info, attempt)
+                
+            except Exception as e:
+                # Non-rate-limit error - propagate immediately
+                logger.error(f"Non-rate-limit error in LLM invocation: {e}")
+                raise RuntimeError(f"AI service error: {str(e)}")
+        
+        # Should never reach here, but just in case
+        raise RuntimeError("Unexpected error in LLM retry logic")
     
     def _build_enhanced_explanation(
         self, 

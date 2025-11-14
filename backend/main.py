@@ -5,6 +5,7 @@ Replaces mock database with real PostgreSQL operations
 
 from dotenv import load_dotenv
 import os
+import logging
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,6 +18,9 @@ from enum import Enum
 from datetime import datetime
 from sqlalchemy.orm import Session
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
 # Import database and CRUD operations
 from database import get_db, init_db, db as database
 from crud import (
@@ -24,7 +28,8 @@ from crud import (
     get_user_transactions, get_recent_transactions,
     calculate_transaction_stats, create_transaction_feedback,
     get_user_behavior, update_user_behavior, create_automation_rule,
-    get_user_automation_rules, get_or_create_merchant, create_credit_card, update_card, deactivate_card, get_card
+    get_user_automation_rules, get_or_create_merchant, create_credit_card, update_card, deactivate_card, get_card,
+    get_user_analytics
 )
 from models import (
     User as UserModel, CreditCard as CreditCardModel,
@@ -38,6 +43,9 @@ from agentic_enhancements import (
     planning_agent, learning_agent, automation_agent,
     get_agentic_recommendation
 )
+
+# Import auth utilities
+from auth import hash_password, verify_password, generate_user_id
 
 app = FastAPI(
     title="Agentic Wallet API",
@@ -79,9 +87,9 @@ class Category(str, Enum):
 class TransactionRequest(BaseModel):
     user_id: str
     merchant: str
-    amount: float = Field(gt=0)
-    category: Category
-    optimization_goal: OptimizationGoal
+    amount: Optional[float] = Field(default=None, gt=0)
+    category: Optional[Category] = None
+    optimization_goal: Optional[OptimizationGoal] = None
     location: Optional[str] = None
     timestamp: Optional[datetime] = None
 
@@ -118,6 +126,17 @@ class RecommendationResponse(BaseModel):
     total_savings: float
 
 
+class RecommendedCardSimple(BaseModel):
+    card_name: str
+    reason: str
+    estimated_value: str
+
+
+class SimpleRecommendationResponse(BaseModel):
+    recommended_card: RecommendedCardSimple
+    alternatives: List[RecommendedCardSimple] = Field(default_factory=list)
+
+
 class UserStats(BaseModel):
     total_transactions: int
     total_spent: float
@@ -147,6 +166,28 @@ class CreditCardUpdateRequest(BaseModel):
     benefits: Optional[List[str]] = None
     credit_limit: Optional[float] = Field(None, ge=0)
     is_active: Optional[bool] = None
+
+
+class SignupRequest(BaseModel):
+    """Schema for user signup"""
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., min_length=6, description="Password (minimum 6 characters)")
+    full_name: str = Field(..., min_length=1, description="User's full name")
+    phone: Optional[str] = Field(None, description="Phone number")
+
+
+class SigninRequest(BaseModel):
+    """Schema for user signin"""
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., description="Password")
+
+
+class AuthResponse(BaseModel):
+    """Schema for authentication response"""
+    user_id: str
+    email: str
+    full_name: str
+    message: str
     
     
 # ============================================================================
@@ -190,7 +231,114 @@ async def health_check():
     }
 
 
-@app.post("/api/v1/recommend", response_model=RecommendationResponse)
+# ============================================================================
+# AUTHENTICATION ENDPOINTS
+# ============================================================================
+
+@app.post("/api/v1/auth/signup", response_model=AuthResponse, status_code=201)
+async def signup(request: SignupRequest, db: Session = Depends(get_db)):
+    """
+    Create a new user account
+    """
+    try:
+        # Check if user already exists
+        existing_user = db.query(UserModel).filter(UserModel.email == request.email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=400,
+                detail="Email already registered"
+            )
+
+        # Generate user ID and hash password
+        user_id = generate_user_id()
+        password_hash = hash_password(request.password)
+
+        # Create new user
+        new_user = UserModel(
+            user_id=user_id,
+            email=request.email,
+            password_hash=password_hash,
+            full_name=request.full_name,
+            phone=request.phone
+        )
+
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+
+        # Initialize user behavior record
+        from crud import create_user_behavior
+        create_user_behavior(db, user_id)
+
+        logger.info(f"New user created: {user_id} - {request.email}")
+
+        return AuthResponse(
+            user_id=new_user.user_id,
+            email=new_user.email,
+            full_name=new_user.full_name,
+            message="Account created successfully"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during signup: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating account: {str(e)}"
+        )
+
+
+@app.post("/api/v1/auth/signin", response_model=AuthResponse)
+async def signin(request: SigninRequest, db: Session = Depends(get_db)):
+    """
+    Sign in an existing user
+    """
+    try:
+        # Find user by email
+        user = db.query(UserModel).filter(UserModel.email == request.email).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password"
+            )
+
+        # Verify password
+        if not verify_password(request.password, user.password_hash):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password"
+            )
+
+        # Check if user is active
+        if not user.is_active:
+            raise HTTPException(
+                status_code=403,
+                detail="Account is inactive. Please contact support."
+            )
+
+        logger.info(f"User signed in: {user.user_id} - {user.email}")
+
+        return AuthResponse(
+            user_id=user.user_id,
+            email=user.email,
+            full_name=user.full_name,
+            message="Signed in successfully"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during signin: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error signing in: {str(e)}"
+        )
+
+
+@app.post("/api/v1/recommend", response_model=SimpleRecommendationResponse)
 async def get_card_recommendation(
     request: TransactionRequest,
     db: Session = Depends(get_db)
@@ -224,56 +372,84 @@ async def get_card_recommendation(
             for card in user_cards
         ]
         
-        # Prepare transaction data for AI
+        # Prepare transaction data for AI with sensible defaults
+        amount = request.amount or 0.0
+        category_value = (
+            request.category.value if request.category else Category.OTHER.value
+        )
+        goal_value = (
+            request.optimization_goal.value
+            if request.optimization_goal
+            else OptimizationGoal.BALANCED.value
+        )
+
         transaction_data = {
             "merchant": request.merchant,
-            "amount": request.amount,
-            "category": request.category,
-            "optimization_goal": request.optimization_goal
+            "amount": amount,
+            "category": category_value,
+            "optimization_goal": goal_value
         }
         
-        # Get AI recommendation
-        result = agentic_system.get_recommendation(
-            transaction_data,
-            user_cards_dict
+        # Get AI recommendation - will raise RuntimeError if Groq unavailable
+        try:
+            result = agentic_system.get_recommendation(
+                transaction_data,
+                user_cards_dict
+            )
+        except RuntimeError as e:
+            # AI service unavailable - notify user clearly
+            logger.error(f"AI service error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"AI recommendation service unavailable: {str(e)}"
+            )
+        
+        # Map detailed AI result to simplified response shape
+        def summarize_card(card_dict: Dict, txn_amount: float, category: str) -> RecommendedCardSimple:
+            reason = card_dict.get("explanation", "")
+
+            if txn_amount and txn_amount > 0:
+                points_earned = float(card_dict.get("points_earned", 0) or 0)
+                cash_back_earned = float(card_dict.get("cash_back_earned", 0) or 0)
+
+                if points_earned > 0:
+                    points_per_dollar = points_earned / txn_amount
+                    estimated_value = f"{points_per_dollar:.1f} points per $1"
+                elif cash_back_earned > 0:
+                    cash_back_rate = cash_back_earned / txn_amount
+                    estimated_value = f"{cash_back_rate * 100:.1f}% cash back"
+                else:
+                    estimated_value = f"Optimized for {category}"
+            else:
+                estimated_value = f"Optimized for {category}"
+
+            return RecommendedCardSimple(
+                card_name=card_dict["card_name"],
+                reason=reason,
+                estimated_value=estimated_value,
+            )
+
+        best_card = result["recommended_card"]
+        alternative_cards = result.get("alternative_cards", [])
+
+        simple_best = summarize_card(best_card, amount, category_value)
+        simple_alternatives = [
+            summarize_card(alt, amount, category_value) for alt in alternative_cards
+        ]
+
+        return SimpleRecommendationResponse(
+            recommended_card=simple_best,
+            alternatives=simple_alternatives,
         )
-        
-        # Store transaction in database
-        recommended_card_id = result["recommended_card"]["card_id"]
-        transaction = create_transaction(
-            db,
-            user_id=request.user_id,
-            merchant=request.merchant,
-            amount=request.amount,
-            category=CategoryEnum(request.category),
-            optimization_goal=OptimizationGoalEnum(request.optimization_goal),
-            recommended_card_id=recommended_card_id,
-            location=request.location,
-            recommendation_explanation=result["recommended_card"]["explanation"],
-            confidence_score=result["recommended_card"]["confidence_score"],
-            alternative_cards=[
-                {
-                    "card_id": alt["card_id"],
-                    "expected_value": alt["expected_value"]
-                }
-                for alt in result["alternative_cards"]
-            ],
-            cash_back_earned=result["recommended_card"]["cash_back_earned"],
-            points_earned=result["recommended_card"]["points_earned"],
-            total_value_earned=result["recommended_card"]["expected_value"],
-            optimal_value=result["recommended_card"]["expected_value"]
-        )
-        
-        # Get or create merchant
-        get_or_create_merchant(db, request.merchant, CategoryEnum(request.category))
-        
-        return RecommendationResponse(**result)
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error in recommendation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in recommendation: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 
 @app.get("/api/v1/users/{user_id}/cards", response_model=List[CreditCard])
@@ -344,6 +520,49 @@ async def get_user_statistics(user_id: str, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/users/{user_id}/analytics")
+async def get_user_analytics_endpoint(
+    user_id: str,
+    days: int = 30,
+    db: Session = Depends(get_db)
+):
+    """
+    Get comprehensive analytics for a user
+    
+    Returns detailed insights including:
+    - Total savings and rewards over time period
+    - Best performing credit card
+    - Category-wise spending breakdown
+    - Weekly trends
+    - Top merchants
+    - Optimization insights and recommendations
+    
+    Args:
+        user_id: User's unique identifier
+        days: Number of days to analyze (default: 30, max: 365)
+    """
+    try:
+        user = get_user(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Validate days parameter
+        if days < 1 or days > 365:
+            raise HTTPException(
+                status_code=400,
+                detail="Days parameter must be between 1 and 365"
+            )
+        
+        analytics = get_user_analytics(db, user_id, days=days)
+        return analytics
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting analytics for user {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

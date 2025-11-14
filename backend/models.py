@@ -48,9 +48,10 @@ class CardIssuerEnum(str, enum.Enum):
 class User(Base):
     """User account information"""
     __tablename__ = "users"
-    
+
     user_id = Column(String(50), primary_key=True)
     email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)  # Hashed password
     full_name = Column(String(255))
     phone = Column(String(20))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
