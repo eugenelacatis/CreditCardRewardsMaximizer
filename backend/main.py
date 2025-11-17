@@ -296,8 +296,28 @@ async def signin(request: SigninRequest, db: Session = Depends(get_db)):
     Sign in an existing user
     """
     try:
+        # Test database connection first
+        try:
+            from sqlalchemy import text
+            db.execute(text("SELECT 1"))
+        except Exception as conn_error:
+            logger.error(f"Database connection error: {conn_error}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database connection error: {str(conn_error)}"
+            )
+        
         # Find user by email
-        user = db.query(UserModel).filter(UserModel.email == request.email).first()
+        try:
+            user = db.query(UserModel).filter(UserModel.email == request.email).first()
+        except Exception as query_error:
+            logger.error(f"Database query error: {query_error}", exc_info=True)
+            logger.error(f"Query error type: {type(query_error)}")
+            logger.error(f"Query error args: {query_error.args}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database query error: {str(query_error)}"
+            )
 
         if not user:
             raise HTTPException(
@@ -332,6 +352,8 @@ async def signin(request: SigninRequest, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error during signin: {e}", exc_info=True)
+        logger.error(f"Error type: {type(e)}")
+        logger.error(f"Error args: {e.args}")
         raise HTTPException(
             status_code=500,
             detail=f"Error signing in: {str(e)}"

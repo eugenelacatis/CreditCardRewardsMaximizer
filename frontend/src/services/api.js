@@ -3,7 +3,7 @@
 import axios from 'axios';
 
 // 🔥 UPDATE THIS with your current tunnel URL from Terminal 2!
-//const API_BASE_URL = 'https://hip-wolves-yell.loca.lt/api/v1'; //for mobile
+const API_BASE_URL = 'https://poor-boats-relax.loca.lt/api/v1'; //for mobile
 
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('📡 API Configuration');
@@ -13,7 +13,7 @@ console.log('━━━━━━━━━━━━━━━━━━━━━━�
 // Use your Mac's local IP address for physical device/iOS simulator testing
 // For web browser testing, use localhost
 // const API_BASE_URL = 'http://10.0.0.222:8000/api/v1';  // Mac local IP
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';  // For web browser only
+//const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';  // For web browser only
 // const API_BASE_URL = 'http://192.168.1.98:8000/api/v1';
 
 
@@ -23,7 +23,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Bypass-Tunnel-Reminder': 'true',  // Skip localtunnel warning page
   },
-  timeout: 30000, // 30 seconds (tunnels can be slow)
+  timeout: 10000
 });
 
 // Request interceptor for debugging
@@ -51,9 +51,25 @@ api.interceptors.response.use(
   (error) => {
     const fullURL = error.config?.baseURL + error.config?.url;
     console.error('❌ Request failed');
-    console.error('❌ Status:', error.response?.status);
-    console.error('❌ URL:', fullURL);
-    console.error('❌ Error:', error.response?.data);
+    
+    // Better error handling for different error types
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      console.error('⏱️ TIMEOUT ERROR - Request took too long');
+      console.error('⏱️ This usually means:');
+      console.error('   1. The backend server is not running');
+      console.error('   2. The tunnel URL is not accessible');
+      console.error('   3. Network connectivity issues');
+      console.error('⏱️ URL:', fullURL);
+      error.message = 'Request timeout. Please check if the backend server is running and the tunnel URL is correct.';
+    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      console.error('🔌 CONNECTION ERROR - Cannot reach server');
+      console.error('🔌 URL:', fullURL);
+      error.message = 'Cannot connect to server. Please check if the backend is running and the URL is correct.';
+    } else {
+      console.error('❌ Status:', error.response?.status);
+      console.error('❌ URL:', fullURL);
+      console.error('❌ Error:', error.response?.data || error.message);
+    }
     return Promise.reject(error);
   }
 );
@@ -120,9 +136,7 @@ export const API = {
   getCards: async (userId = 'user123') => {
     try {
       console.log('🃏 Getting cards...');
-      const response = await api.get('/cards', {
-        params: { user_id: userId }
-      });
+      const response = await api.get(`/users/${userId}/cards`);
       console.log(`✅ Found ${response.data.length} cards`);
       return response.data;
     } catch (error) {
@@ -135,7 +149,11 @@ export const API = {
   addCard: async (cardData) => {
     try {
       console.log('➕ Adding card...');
-      const response = await api.post('/cards', cardData);
+      // Extract user_id from cardData and pass as query parameter
+      const { user_id, ...cardPayload } = cardData;
+      const response = await api.post('/cards', cardPayload, {
+        params: { user_id }
+      });
       console.log('✅ Card added!');
       return response.data;
     } catch (error) {
@@ -167,7 +185,7 @@ export const API = {
     console.log('Data:', JSON.stringify(signupData, null, 2));
 
     try {
-      const response = await apiClient.post('/auth/signup', signupData);
+      const response = await api.post('/auth/signup', signupData);
       console.log('✅ Signup successful:', response.data);
       return response;
     } catch (error) {
@@ -191,7 +209,7 @@ export const API = {
     console.log('Email:', signinData.email);
 
     try {
-      const response = await apiClient.post('/auth/signin', signinData);
+      const response = await api.post('/auth/signin', signinData);
       console.log('✅ Signin successful:', response.data);
       return response;
     } catch (error) {

@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { API } from '../services/api';
 
 const CATEGORIES = [
+  { id: 'auto', label: 'Auto-detect', emoji: '🤖' },
   { id: 'dining', label: 'Dining', emoji: '🍽️' },
   { id: 'travel', label: 'Travel', emoji: '✈️' },
   { id: 'groceries', label: 'Groceries', emoji: '🛒' },
@@ -32,7 +33,7 @@ const GOALS = [
 export default function TransactionScreen() {
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('dining');
+  const [selectedCategory, setSelectedCategory] = useState('auto');
   const [selectedGoal, setSelectedGoal] = useState('cash_back');
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -40,13 +41,9 @@ export default function TransactionScreen() {
   const [currentTransaction, setCurrentTransaction] = useState(null); // Store current transaction
 
   const handleGetRecommendation = async () => {
-    // Validation
+    // Validation - only merchant is required
     if (!merchant.trim()) {
       Alert.alert('Error', 'Please enter a merchant name');
-      return;
-    }
-    if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
       return;
     }
 
@@ -55,11 +52,14 @@ export default function TransactionScreen() {
     try {
       console.log('Sending request to API...');
       
+      // Amount is optional - use 0 or null if not provided
+      const amountValue = amount && parseFloat(amount) > 0 ? parseFloat(amount) : null;
+      
       const transactionData = {
         user_id: 'user123',
         merchant: merchant.trim(),
-        amount: parseFloat(amount),
-        category: selectedCategory,
+        amount: amountValue,
+        category: selectedCategory === 'auto' ? null : selectedCategory,
         optimization_goal: selectedGoal,
       };
 
@@ -250,26 +250,35 @@ export default function TransactionScreen() {
 
         {/* Form */}
         <View style={styles.form}>
-          {/* Merchant Input */}
-          <Text style={styles.label}>Where are you shopping?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., Starbucks, Amazon, Whole Foods"
-            value={merchant}
-            onChangeText={setMerchant}
-            placeholderTextColor="#999"
-          />
+          {/* Merchant Input - Prominent */}
+          <View style={styles.merchantSection}>
+            <Text style={styles.merchantLabel}>Where are you shopping? *</Text>
+            <TextInput
+              style={styles.merchantInput}
+              placeholder="e.g., Starbucks, Amazon, Whole Foods"
+              value={merchant}
+              onChangeText={setMerchant}
+              placeholderTextColor="#999"
+              autoFocus={false}
+            />
+          </View>
 
-          {/* Amount Input */}
-          <Text style={styles.label}>How much?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0.00"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            placeholderTextColor="#999"
-          />
+          {/* Amount Input - Optional */}
+          <View style={styles.amountSection}>
+            <View style={styles.amountLabelRow}>
+              <Text style={styles.amountLabel}>Amount</Text>
+              <Text style={styles.optionalLabel}>(Optional)</Text>
+            </View>
+            <Text style={styles.optionalHint}>Used to show estimated rewards</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0.00"
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              placeholderTextColor="#999"
+            />
+          </View>
 
           {/* Category Selection */}
           <Text style={styles.label}>What category?</Text>
@@ -336,12 +345,57 @@ const styles = StyleSheet.create({
   form: {
     padding: 20,
   },
+  merchantSection: {
+    marginBottom: 24,
+  },
+  merchantLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  merchantInput: {
+    backgroundColor: '#fff',
+    padding: 18,
+    borderRadius: 12,
+    fontSize: 18,
+    borderWidth: 2,
+    borderColor: '#4A90E2',
+    fontWeight: '500',
+  },
+  amountSection: {
+    marginBottom: 20,
+  },
+  amountLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 6,
+  },
+  amountLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
   label: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginTop: 20,
     marginBottom: 10,
+  },
+  optionalLabel: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#999',
+    marginLeft: 8,
+    fontStyle: 'italic',
+  },
+  optionalHint: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 10,
+    fontStyle: 'italic',
   },
   input: {
     backgroundColor: '#fff',
