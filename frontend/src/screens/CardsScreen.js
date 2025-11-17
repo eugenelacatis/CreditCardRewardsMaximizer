@@ -1,10 +1,10 @@
 // src/screens/CardsScreen.js
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
   TouchableOpacity,
   Modal,
   TextInput,
@@ -14,12 +14,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API } from '../services/api';
+import axios from 'axios';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = 'http://10.0.0.222:8000';
 
-export default function CardsScreen({ navigation, route }) {
-  const USER_ID = route?.params?.userId || 'demo-user-123';
-
+export default function CardsScreen() {
+  const [userId, setUserId] = useState(null);
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,13 +36,14 @@ export default function CardsScreen({ navigation, route }) {
     last4: '',
   });
 
-  const safeJson = async (res) => {
-    try {
-      return await res.json();
-    } catch {
-      return null;
-    }
-  };
+  // Load user ID on mount
+  useEffect(() => {
+    const loadUserId = async () => {
+      const id = await AsyncStorage.getItem('userId');
+      setUserId(id);
+    };
+    loadUserId();
+  }, []);
 
   const apiCardToUi = useCallback((c) => {
     const rewardsText = Array.isArray(c?.benefits) && c.benefits.length > 0
@@ -59,33 +62,32 @@ export default function CardsScreen({ navigation, route }) {
   }, []);
 
   const fetchCards = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/users/${encodeURIComponent(USER_ID)}/cards`);
-      if (!res.ok) {
-        // Treat 404 as "no cards"/empty state
-        if (res.status === 404) {
-          setCards([]);
-          setErrorMsg(null);
-        } else {
-          const text = await res.text().catch(() => '');
-          setCards([]); // ensure safe empty state
-          setErrorMsg(text || `Failed to load cards (HTTP ${res.status})`);
-        }
-      } else {
-        const data = await safeJson(res);
-        const list = Array.isArray(data) ? data : [];
-        setCards(list.map(apiCardToUi));
-      }
+      const response = await API.getUserCards(userId);
+      const list = Array.isArray(response.data) ? response.data : [];
+      setCards(list.map(apiCardToUi));
+      setErrorMsg(null);
     } catch (err) {
-      // Network or unexpected error: still render with empty list
+      console.error('Error fetching cards:', err);
       setCards([]);
-      setErrorMsg('Network error while loading cards. Pull to retry.');
+
+      // Check if it's a 404 (user not found or no cards)
+      if (err.response?.status === 404) {
+        setErrorMsg(null); // No error for empty state
+      } else {
+        setErrorMsg('Could not load cards. Pull down to retry.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [USER_ID, apiCardToUi]);
+  }, [userId, apiCardToUi]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -106,6 +108,11 @@ export default function CardsScreen({ navigation, route }) {
       return;
     }
 
+    if (!userId) {
+      Alert.alert('Error', 'User not logged in. Please log in again.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
@@ -121,21 +128,15 @@ export default function CardsScreen({ navigation, route }) {
         credit_limit: null,
       };
 
-      const res = await fetch(`${API_BASE}/api/v1/cards?user_id=${encodeURIComponent(USER_ID)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await axios.post(
+        `${API_BASE_URL}/api/v1/cards?user_id=${encodeURIComponent(userId)}`,
+        payload,
+        {
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        // keep modal open; show friendly error
-        Alert.alert('Error', text || 'Could not add the card.');
-        return;
-        // Do not throw; we want to keep UI responsive
-      }
-
-      const created = await safeJson(res);
+      const created = res.data;
       if (!created || typeof created !== 'object') {
         Alert.alert('Error', 'Unexpected server response.');
         return;
@@ -146,12 +147,13 @@ export default function CardsScreen({ navigation, route }) {
       setShowAddModal(false);
       setNewCard({ name: '', type: 'Visa', rewards: '', last4: '' });
       Alert.alert('Success', `${uiCard.name} added to your wallet!`);
-    } catch {
-      Alert.alert('Error', 'Network error while adding the card.');
+    } catch (error) {
+      console.error('Error adding card:', error);
+      Alert.alert('Error', error.response?.data?.detail || 'Could not add the card.');
     } finally {
       setSubmitting(false);
     }
-  }, [USER_ID, newCard, apiCardToUi]);
+  }, [userId, newCard, apiCardToUi]);
 
   const handleDeleteCard = useCallback((cardId) => {
     Alert.alert(
@@ -164,19 +166,14 @@ export default function CardsScreen({ navigation, route }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              const res = await fetch(`${API_BASE}/api/v1/cards/${encodeURIComponent(cardId)}`, {
-                method: 'DELETE',
+              await axios.delete(`${API_BASE_URL}/api/v1/cards/${encodeURIComponent(cardId)}`, {
                 headers: { 'Content-Type': 'application/json' },
               });
-              if (!res.ok) {
-                const text = await res.text().catch(() => '');
-                Alert.alert('Error', text || 'Could not delete the card.');
-                return;
-              }
               setCards(prev => prev.filter(c => c.id !== cardId));
               Alert.alert('Removed', 'Card has been deactivated.');
-            } catch {
-              Alert.alert('Error', 'Network error while deleting the card.');
+            } catch (error) {
+              console.error('Error deleting card:', error);
+              Alert.alert('Error', error.response?.data?.detail || 'Could not delete the card.');
             }
           },
         },

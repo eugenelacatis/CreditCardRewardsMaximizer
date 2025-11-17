@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '../services/api';
 
 const CATEGORIES = [
@@ -37,6 +38,16 @@ export default function TransactionScreen() {
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [recommendation, setRecommendation] = useState(null);
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    // Load user ID from AsyncStorage
+    const loadUserId = async () => {
+      const id = await AsyncStorage.getItem('userId');
+      setUserId(id);
+    };
+    loadUserId();
+  }, []);
 
   const handleGetRecommendation = async () => {
     // Validation
@@ -49,13 +60,18 @@ export default function TransactionScreen() {
       return;
     }
 
+    if (!userId) {
+      Alert.alert('Error', 'User not logged in. Please log in again.');
+      return;
+    }
+
     setLoading(true);
-    
+
     try {
       console.log('Sending request to API...');
-      
+
       const response = await API.getRecommendation({
-        user_id: 'user123',
+        user_id: userId,
         merchant: merchant.trim(),
         amount: parseFloat(amount),
         category: selectedCategory,
@@ -63,14 +79,14 @@ export default function TransactionScreen() {
       });
 
       console.log('API Response:', response.data);
-      
+
       setRecommendation(response.data);
       setShowResult(true);
-      
+
     } catch (error) {
       console.error('API Error:', error);
       Alert.alert(
-        'Connection Error', 
+        'Connection Error',
         'Could not connect to server. Make sure backend is running.\n\nError: ' + error.message
       );
     } finally {

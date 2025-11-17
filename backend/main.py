@@ -483,6 +483,13 @@ async def get_user_transaction_history(
         
         transactions = get_user_transactions(db, user_id, limit=limit)
         
+        # Calculate recommended card name from card_id
+        def get_card_name(card_id):
+            if not card_id:
+                return None
+            card = db.query(CreditCardModel).filter(CreditCardModel.card_id == card_id).first()
+            return card.card_name if card else None
+
         return {
             "user_id": user_id,
             "total_transactions": len(transactions),
@@ -493,13 +500,44 @@ async def get_user_transaction_history(
                     "amount": t.amount,
                     "category": t.category.value,
                     "card_used": t.card.card_name if t.card else None,
-                    "rewards_earned": t.total_value_earned,
-                    "date": t.transaction_date.isoformat()
+                    "card_used_id": t.card_id,
+                    "card_recommended": get_card_name(t.recommended_card_id),
+                    "card_recommended_id": t.recommended_card_id,
+                    "used_recommended_card": t.used_recommended_card,
+                    "rewards_earned": t.total_value_earned or 0,
+                    "optimal_value": t.optimal_value or 0,
+                    "missed_value": (t.optimal_value or 0) - (t.total_value_earned or 0) if t.optimal_value and t.total_value_earned else 0,
+                    "date": t.transaction_date.isoformat(),
+                    "optimal": t.used_recommended_card if t.used_recommended_card is not None else True
                 }
                 for t in transactions
             ]
         }
         
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/users/{user_id}/profile")
+async def get_user_profile(user_id: str, db: Session = Depends(get_db)):
+    """Get user profile information"""
+    try:
+        user = get_user(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {
+            "user_id": user.user_id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "phone": user.phone,
+            "default_optimization_goal": user.default_optimization_goal.value if user.default_optimization_goal else None,
+            "created_at": user.created_at.isoformat(),
+            "is_active": user.is_active
+        }
+
     except HTTPException:
         raise
     except Exception as e:
@@ -513,10 +551,10 @@ async def get_user_statistics(user_id: str, db: Session = Depends(get_db)):
         user = get_user(db, user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         stats = calculate_transaction_stats(db, user_id)
         return UserStats(**stats)
-        
+
     except HTTPException:
         raise
     except Exception as e:
