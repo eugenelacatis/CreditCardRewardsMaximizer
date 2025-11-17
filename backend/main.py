@@ -1350,25 +1350,26 @@ async def get_location_based_recommendations(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        user_cards = get_user_cards(db, request.user_id)
-        if not user_cards:
+        # Get user's credit cards with full library details (including benefits)
+        user_cards_with_details = get_user_cards_with_details(db, request.user_id, active_only=True)
+        if not user_cards_with_details:
             raise HTTPException(
                 status_code=400,
                 detail="User has no credit cards. Please add cards first."
             )
 
-        # Convert SQLAlchemy models to dictionaries for AI agent
+        # Convert to dictionaries for AI agent - includes all benefits and card details
         user_cards_dict = [
             {
-                "card_id": card.card_id,
-                "card_name": card.card_name,
-                "issuer": card.issuer.value,
-                "cash_back_rate": card.cash_back_rate,
-                "points_multiplier": card.points_multiplier,
-                "annual_fee": card.annual_fee,
-                "benefits": card.benefits or []
+                "card_id": card["card_id"],
+                "card_name": card["card_name"],
+                "issuer": card["issuer"],
+                "cash_back_rate": card["cash_back_rate"],
+                "points_multiplier": card["points_multiplier"],
+                "annual_fee": card["annual_fee"],
+                "benefits": card["benefits"] or []
             }
-            for card in user_cards
+            for card in user_cards_with_details
         ]
 
         # Get nearby places
