@@ -6,7 +6,7 @@ import { API } from '../services/api';
 import LocationService from '../services/locationService';
 import NearbyPlacesCard from '../components/NearbyPlacesCard';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const [stats, setStats] = useState({
     total_rewards: 0,
     total_transactions: 0,
@@ -20,6 +20,8 @@ export default function HomeScreen() {
   const [nearbyRecommendations, setNearbyRecommendations] = useState([]);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [locationError, setLocationError] = useState(null);
+  const [hasCards, setHasCards] = useState(true);
+  const [cardsError, setCardsError] = useState(false);
 
   const fetchUserData = async () => {
     try {
@@ -31,8 +33,30 @@ export default function HomeScreen() {
       }
 
       if (userId) {
-        const response = await API.getUserStats(userId);
-        setStats(response.data);
+        // Check if user has cards in wallet
+        try {
+          const walletResponse = await API.getWalletCards(userId);
+          const walletCards = Array.isArray(walletResponse.data) ? walletResponse.data : [];
+          setHasCards(walletCards.length > 0);
+          setCardsError(false);
+        } catch (err) {
+          // If 404, user has no cards - this is normal for new users
+          if (err.response?.status === 404) {
+            setHasCards(false);
+            setCardsError(false);
+          } else {
+            setCardsError(true);
+          }
+        }
+
+        // Fetch stats
+        try {
+          const response = await API.getUserStats(userId);
+          setStats(response.data);
+        } catch (error) {
+          console.error('Error fetching stats:', error);
+          // Keep default values on error
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -136,15 +160,35 @@ export default function HomeScreen() {
           <Text style={styles.cardText}>
             Your intelligent credit card recommendation system is ready.
           </Text>
-          <Text style={styles.cardText}>
-            Tap the Transaction tab below to get AI-powered recommendations!
-          </Text>
+          {!loading && !hasCards ? (
+            <Text style={styles.cardText}>
+              Get started by adding your credit cards in the Cards tab!
+            </Text>
+          ) : (
+            <Text style={styles.cardText}>
+              Tap the Transaction tab below to get AI-powered recommendations!
+            </Text>
+          )}
         </View>
 
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4A90E2" />
             <Text style={styles.loadingText}>Loading your stats...</Text>
+          </View>
+        ) : !hasCards ? (
+          <View style={styles.noCardsContainer}>
+            <Text style={styles.noCardsEmoji}>🃏</Text>
+            <Text style={styles.noCardsTitle}>No Cards Yet</Text>
+            <Text style={styles.noCardsText}>
+              Add your credit cards to start getting personalized recommendations and maximize your rewards!
+            </Text>
+            <TouchableOpacity
+              style={styles.addCardsButton}
+              onPress={() => navigation.navigate('Cards')}
+            >
+              <Text style={styles.addCardsButtonText}>📚 Add Cards Now</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.statsContainer}>
@@ -288,6 +332,46 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: '#666',
+  },
+  noCardsContainer: {
+    backgroundColor: '#fff',
+    margin: 20,
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  noCardsEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  noCardsTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  noCardsText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  addCardsButton: {
+    backgroundColor: '#4A90E2',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  addCardsButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   insightCard: {
     backgroundColor: '#fff',

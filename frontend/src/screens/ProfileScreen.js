@@ -6,10 +6,6 @@ import { API } from '../services/api';
 // Accept the 'onLogout' prop passed from App.js
 export default function ProfileScreen({ onLogout }) {
   const [profile, setProfile] = useState(null);
-  const [stats, setStats] = useState({
-    total_rewards: 0,
-    total_transactions: 0
-  });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -18,14 +14,8 @@ export default function ProfileScreen({ onLogout }) {
       const userId = await AsyncStorage.getItem('userId');
 
       if (userId) {
-        // Fetch profile and stats in parallel
-        const [profileResponse, statsResponse] = await Promise.all([
-          API.getUserProfile(userId),
-          API.getUserStats(userId)
-        ]);
-
+        const profileResponse = await API.getUserProfile(userId);
         setProfile(profileResponse.data);
-        setStats(statsResponse.data);
       }
     } catch (error) {
       console.error('Error fetching profile data:', error);
@@ -86,17 +76,6 @@ export default function ProfileScreen({ onLogout }) {
               </Text>
             </View>
 
-            <View style={styles.statsGrid}>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>${stats.total_rewards.toFixed(2)}</Text>
-                <Text style={styles.statLabel}>Total Rewards</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{stats.total_transactions}</Text>
-                <Text style={styles.statLabel}>Transactions</Text>
-              </View>
-            </View>
-
             {profile && (
               <View style={styles.infoSection}>
                 <Text style={styles.sectionTitle}>Account Information</Text>
@@ -149,23 +128,6 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 32, fontWeight: 'bold', color: '#fff' },
   userName: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 4 },
   userEmail: { fontSize: 14, color: '#666' },
-  statsGrid: { flexDirection: 'row', padding: 16, gap: 12 },
-  statBox: { 
-    flex: 1, 
-    backgroundColor: '#fff', 
-    padding: 16, 
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statValue: { fontSize: 24, fontWeight: 'bold', color: '#4A90E2' },
-  statLabel: { fontSize: 12, color: '#666', marginTop: 4 },
-  
-  // --- ADDED THESE STYLES ---
   logoutButton: {
     backgroundColor: '#fff',
     borderColor: '#E74C3C',
