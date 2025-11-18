@@ -134,14 +134,48 @@ class RecommendationResponse(BaseModel):
 
 
 class RecommendedCardSimple(BaseModel):
+    card_id: str
     card_name: str
     reason: str
     estimated_value: str
+    explanation: Optional[str] = None
 
 
 class SimpleRecommendationResponse(BaseModel):
     recommended_card: RecommendedCardSimple
     alternatives: List[RecommendedCardSimple] = Field(default_factory=list)
+
+
+class CreateTransactionRequest(BaseModel):
+    """Request body for creating a transaction"""
+    user_id: str
+    merchant: str
+    amount: float = Field(..., gt=0)
+    category: Category
+    card_used_id: str  # The card the user actually used
+    recommended_card_id: Optional[str] = None
+    optimization_goal: Optional[OptimizationGoal] = OptimizationGoal.CASH_BACK
+    location: Optional[str] = None
+    cash_back_earned: Optional[float] = 0.0
+    points_earned: Optional[float] = 0.0
+    total_value_earned: Optional[float] = 0.0
+    optimal_value: Optional[float] = None
+    recommendation_explanation: Optional[str] = None
+    confidence_score: Optional[float] = None
+
+
+class CreateTransactionResponse(BaseModel):
+    """Response for created transaction"""
+    transaction_id: str
+    user_id: str
+    merchant: str
+    amount: float
+    category: str
+    card_used: str
+    card_used_id: str
+    rewards_earned: float
+    date: str
+    message: str
 
 
 class UserStats(BaseModel):
@@ -617,6 +651,78 @@ async def get_user_transaction_history(
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/transactions", response_model=CreateTransactionResponse)
+async def create_new_transaction(
+    request: CreateTransactionRequest,
+    db: Session = Depends(get_db)
+):
+    """Create a new transaction record"""
+    try:
+        # Verify user exists
+        user = get_user(db, request.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Verify card exists and get card name
+        card = db.query(CreditCardModel).filter(
+            CreditCardModel.card_id == request.card_used_id
+        ).first()
+        if not card:
+            raise HTTPException(status_code=404, detail="Card not found")
+
+        # Convert Pydantic enum to SQLAlchemy enum
+        category_enum = CategoryEnum(request.category.value)
+        optimization_goal_enum = OptimizationGoalEnum(
+            request.optimization_goal.value if request.optimization_goal else "cash_back"
+        )
+
+        # Calculate missed value if optimal_value is provided
+        missed_value = None
+        if request.optimal_value is not None and request.total_value_earned is not None:
+            missed_value = request.optimal_value - request.total_value_earned
+
+        # Create the transaction
+        transaction = create_transaction(
+            db=db,
+            user_id=request.user_id,
+            merchant=request.merchant,
+            amount=request.amount,
+            category=category_enum,
+            optimization_goal=optimization_goal_enum,
+            card_id=request.card_used_id,
+            recommended_card_id=request.recommended_card_id,
+            location=request.location,
+            cash_back_earned=request.cash_back_earned or 0.0,
+            points_earned=request.points_earned or 0.0,
+            total_value_earned=request.total_value_earned or 0.0,
+            optimal_value=request.optimal_value,
+            optimal_cash_back=request.optimal_value,  # Simplified
+            optimal_points=0.0,
+            missed_value=missed_value,
+            recommendation_explanation=request.recommendation_explanation,
+            confidence_score=request.confidence_score
+        )
+
+        return CreateTransactionResponse(
+            transaction_id=transaction.transaction_id,
+            user_id=transaction.user_id,
+            merchant=transaction.merchant,
+            amount=transaction.amount,
+            category=transaction.category.value,
+            card_used=card.card_name,
+            card_used_id=transaction.card_id,
+            rewards_earned=transaction.total_value_earned or 0.0,
+            date=transaction.transaction_date.isoformat(),
+            message="Transaction created successfully"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating transaction: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1467,9 +1573,11 @@ async def get_location_based_recommendations(
                     distance_formatted=location_service.format_distance(place['distance_meters'])
                 ),
                 recommended_card=RecommendedCardSimple(
+                    card_id=rec_card.get('card_id', ''),
                     card_name=rec_card.get('card_name', 'Unknown'),
                     reason=rec_card.get('explanation', 'Best rewards for this category'),
-                    estimated_value=f"${rec_card.get('expected_value', 0):.2f}"
+                    estimated_value=f"${rec_card.get('expected_value', 0):.2f}",
+                    explanation=rec_card.get('explanation', 'Best rewards for this category')
                 ),
                 expected_reward=item['expected_reward'],
                 reward_explanation=f"Earn ${item['expected_reward']:.2f} in rewards at {place['name']}"

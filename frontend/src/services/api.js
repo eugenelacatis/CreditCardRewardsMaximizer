@@ -125,6 +125,24 @@ export const API = {
     });
   },
 
+  createTransaction: async (transactionData) => {
+    console.log('');
+    console.log('===============================');
+    console.log('API.createTransaction called');
+    console.log('===============================');
+    console.log('Full URL:', `${API_BASE_URL}/transactions`);
+    console.log('Data:', JSON.stringify(transactionData, null, 2));
+
+    try {
+      const response = await apiClient.post('/transactions', transactionData);
+      console.log('Transaction created:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error creating transaction:', error.message);
+      throw error;
+    }
+  },
+
   getUserStats: async (userId) => {
     return await apiClient.get(`/users/${userId}/stats`);
   },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '../services/api';
@@ -22,6 +22,12 @@ export default function HomeScreen({ navigation }) {
   const [locationError, setLocationError] = useState(null);
   const [hasCards, setHasCards] = useState(true);
   const [cardsError, setCardsError] = useState(false);
+
+  // Transaction modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedRecommendation, setSelectedRecommendation] = useState(null);
+  const [transactionAmount, setTransactionAmount] = useState('');
+  const [creatingTransaction, setCreatingTransaction] = useState(false);
 
   const fetchUserData = async () => {
     try {
@@ -137,6 +143,103 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(false);
   };
 
+  const handleRecommendationPress = (recommendation) => {
+    setSelectedRecommendation(recommendation);
+    setTransactionAmount('');
+    setModalVisible(true);
+  };
+
+  // Map place categories to valid transaction categories
+  const mapPlaceCategoryToTransactionCategory = (placeCategory) => {
+    const categoryMap = {
+      'restaurant': 'dining',
+      'cafe': 'dining',
+      'bar': 'dining',
+      'fast_food': 'dining',
+      'food': 'dining',
+      'supermarket': 'groceries',
+      'grocery': 'groceries',
+      'convenience': 'groceries',
+      'fuel': 'gas',
+      'gas_station': 'gas',
+      'cinema': 'entertainment',
+      'theatre': 'entertainment',
+      'entertainment': 'entertainment',
+      'hotel': 'travel',
+      'travel': 'travel',
+      'airport': 'travel',
+      'shop': 'shopping',
+      'mall': 'shopping',
+      'store': 'shopping',
+      'retail': 'shopping',
+    };
+
+    const lowerCategory = placeCategory.toLowerCase();
+    return categoryMap[lowerCategory] || 'other';
+  };
+
+  const handleCreateTransaction = async () => {
+    if (!transactionAmount || parseFloat(transactionAmount) <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+      return;
+    }
+
+    setCreatingTransaction(true);
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        Alert.alert('Error', 'User not found. Please log in again.');
+        return;
+      }
+
+      const amount = parseFloat(transactionAmount);
+      const recommendation = selectedRecommendation;
+
+      // Calculate rewards based on the expected reward ratio
+      const rewardRate = recommendation.expected_reward / 50; // API uses $50 as default
+      const totalReward = amount * rewardRate;
+
+      // Map the place category to a valid transaction category
+      const transactionCategory = mapPlaceCategoryToTransactionCategory(recommendation.place.category);
+
+      const transactionData = {
+        user_id: userId,
+        merchant: recommendation.place.name,
+        amount: amount,
+        category: transactionCategory,
+        card_used_id: recommendation.recommended_card.card_id,
+        recommended_card_id: recommendation.recommended_card.card_id,
+        optimization_goal: 'cash_back',
+        location: recommendation.place.address,
+        total_value_earned: totalReward,
+        optimal_value: totalReward,
+        recommendation_explanation: recommendation.recommended_card.explanation,
+        confidence_score: 0.95
+      };
+
+      await API.createTransaction(transactionData);
+
+      // Close modal and refresh data
+      setModalVisible(false);
+      setSelectedRecommendation(null);
+      setTransactionAmount('');
+
+      // Refresh stats to show updated totals
+      await fetchUserData();
+
+      Alert.alert(
+        'Transaction Added!',
+        `Successfully recorded $${amount.toFixed(2)} at ${recommendation.place.name}.\nRewards earned: $${totalReward.toFixed(2)}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      Alert.alert('Error', 'Failed to create transaction. Please try again.');
+    } finally {
+      setCreatingTransaction(false);
+    }
+  };
+
   useEffect(() => {
     fetchUserData();
     // Request location permission and fetch recommendations on mount
@@ -244,9 +347,99 @@ export default function HomeScreen({ navigation }) {
           <NearbyPlacesCard
             recommendations={nearbyRecommendations}
             onRefresh={requestLocationPermissionAndFetchRecommendations}
+            onRecommendationPress={handleRecommendationPress}
           />
         )}
       </ScrollView>
+
+      {/* Transaction Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            {selectedRecommendation && (
+              <>
+                <Text style={styles.modalTitle}>Add Transaction</Text>
+
+                <View style={styles.modalPlaceInfo}>
+                  <Text style={styles.modalPlaceName}>
+                    {selectedRecommendation.place.name}
+                  </Text>
+                  <Text style={styles.modalPlaceCategory}>
+                    {selectedRecommendation.place.category}
+                  </Text>
+                </View>
+
+                <View style={styles.modalCardInfo}>
+                  <Text style={styles.modalCardLabel}>Using:</Text>
+                  <Text style={styles.modalCardName}>
+                    {selectedRecommendation.recommended_card.card_name}
+                  </Text>
+                </View>
+
+                <View style={styles.modalInputContainer}>
+                  <Text style={styles.modalInputLabel}>Amount Spent</Text>
+                  <View style={styles.modalInputWrapper}>
+                    <Text style={styles.modalCurrencySymbol}>$</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="0.00"
+                      keyboardType="decimal-pad"
+                      value={transactionAmount}
+                      onChangeText={setTransactionAmount}
+                      autoFocus={true}
+                    />
+                  </View>
+                </View>
+
+                {transactionAmount && parseFloat(transactionAmount) > 0 && (
+                  <View style={styles.modalRewardPreview}>
+                    <Text style={styles.modalRewardLabel}>Estimated Rewards:</Text>
+                    <Text style={styles.modalRewardAmount}>
+                      ${((parseFloat(transactionAmount) * selectedRecommendation.expected_reward) / 50).toFixed(2)}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={styles.modalCancelButton}
+                    onPress={() => {
+                      setModalVisible(false);
+                      setSelectedRecommendation(null);
+                      setTransactionAmount('');
+                    }}
+                  >
+                    <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.modalConfirmButton,
+                      creatingTransaction && styles.modalButtonDisabled
+                    ]}
+                    onPress={handleCreateTransaction}
+                    disabled={creatingTransaction}
+                  >
+                    {creatingTransaction ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.modalConfirmButtonText}>Add Transaction</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -447,5 +640,138 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalPlaceInfo: {
+    backgroundColor: '#F5F7FA',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  modalPlaceName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  modalPlaceCategory: {
+    fontSize: 14,
+    color: '#666',
+    textTransform: 'capitalize',
+  },
+  modalCardInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalCardLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 8,
+  },
+  modalCardName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4A90E2',
+  },
+  modalInputContainer: {
+    marginBottom: 15,
+  },
+  modalInputLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  modalInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F7FA',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  modalCurrencySymbol: {
+    fontSize: 24,
+    color: '#333',
+    fontWeight: '600',
+    marginRight: 5,
+  },
+  modalInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#333',
+    paddingVertical: 15,
+  },
+  modalRewardPreview: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  modalRewardLabel: {
+    fontSize: 14,
+    color: '#2E7D32',
+  },
+  modalRewardAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  modalConfirmButton: {
+    flex: 1,
+    backgroundColor: '#4A90E2',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalConfirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  modalButtonDisabled: {
+    opacity: 0.7,
   },
 });

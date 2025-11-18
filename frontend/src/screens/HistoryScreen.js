@@ -1,82 +1,75 @@
-// src/screens/HistoryScreen.js - Complete with Fixed Emojis
-import React, { useState } from 'react';
+// src/screens/HistoryScreen.js - Complete with Real API Data
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API } from '../services/api';
 
 export default function HistoryScreen() {
   const [timeFilter, setTimeFilter] = useState('all');
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Mock transaction history - Later: Fetch from backend via Atharva's API
-  const transactions = [
-    {
-      id: '1',
-      merchant: 'Starbucks',
-      amount: 15.50,
-      category: 'dining',
-      card_used: 'Amex Gold',
-      card_recommended: 'Amex Gold',
-      cash_back: 0.62,
-      points: 62,
-      date: '2025-01-05',
-      optimal: true,
-    },
-    {
-      id: '2',
-      merchant: 'Shell Gas Station',
-      amount: 45.00,
-      category: 'gas',
-      card_used: 'Citi Double Cash',
-      card_recommended: 'Citi Custom Cash',
-      cash_back: 0.90,
-      points: 0,
-      missed_value: 1.35,
-      date: '2025-01-04',
-      optimal: false,
-    },
-    {
-      id: '3',
-      merchant: 'Whole Foods',
-      amount: 127.43,
-      category: 'groceries',
-      card_used: 'Amex Gold',
-      card_recommended: 'Amex Gold',
-      cash_back: 5.10,
-      points: 510,
-      date: '2025-01-03',
-      optimal: true,
-    },
-    {
-      id: '4',
-      merchant: 'Amazon',
-      amount: 89.99,
-      category: 'shopping',
-      card_used: 'Chase Sapphire',
-      card_recommended: 'Citi Double Cash',
-      cash_back: 0.90,
-      points: 90,
-      missed_value: 0.90,
-      date: '2025-01-02',
-      optimal: false,
-    },
-    {
-      id: '5',
-      merchant: 'AMC Theater',
-      amount: 32.00,
-      category: 'entertainment',
-      card_used: 'Chase Sapphire',
-      card_recommended: 'Chase Sapphire',
-      cash_back: 0.96,
-      points: 96,
-      date: '2025-01-01',
-      optimal: true,
-    },
-  ];
+  const fetchTransactions = async () => {
+    try {
+      setError(null);
+      const userId = await AsyncStorage.getItem('userId');
+
+      if (!userId) {
+        setError('User not found. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
+      const response = await API.getTransactionHistory(userId, 50);
+
+      // Transform API response to match expected format
+      const formattedTransactions = response.data.transactions.map(t => ({
+        id: t.transaction_id,
+        merchant: t.merchant,
+        amount: t.amount,
+        category: t.category,
+        card_used: t.card_used || 'Unknown Card',
+        card_recommended: t.card_recommended || t.card_used,
+        cash_back: t.rewards_earned || 0,
+        points: 0,
+        missed_value: t.missed_value || 0,
+        date: t.date.split('T')[0],
+        optimal: t.optimal
+      }));
+
+      setTransactions(formattedTransactions);
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+      setError('Failed to load transactions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTransactions();
+    setRefreshing(false);
+  };
+
+  // Refresh transactions when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchTransactions();
+    }, [])
+  );
 
   const totalSaved = transactions
     .filter((t) => t.optimal)
@@ -156,6 +149,36 @@ export default function HistoryScreen() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Transaction History</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4A90E2" />
+          <Text style={styles.loadingText}>Loading transactions...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Transaction History</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchTransactions}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -209,26 +232,33 @@ export default function HistoryScreen() {
       {transactions.length === 0 ? (
         <EmptyState />
       ) : (
-        <ScrollView style={styles.transactionsList} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.transactionsList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           {transactions.map((transaction) => (
             <TransactionItem key={transaction.id} transaction={transaction} />
           ))}
 
           {/* Insights */}
-          <View style={styles.insightsSection}>
-            <Text style={styles.insightsSectionTitle}>📊 Insights</Text>
-            <View style={styles.insightCard}>
-              <Text style={styles.insightText}>
-                • You made {transactions.filter((t) => t.optimal).length} optimal decisions this week ({((transactions.filter((t) => t.optimal).length / transactions.length) * 100).toFixed(0)}%)
-              </Text>
-              <Text style={styles.insightText}>
-                • Amex Gold is your most-used card
-              </Text>
-              <Text style={styles.insightText}>
-                • You could save an extra ${totalMissed.toFixed(2)}/week by following all recommendations
-              </Text>
+          {transactions.length > 0 && (
+            <View style={styles.insightsSection}>
+              <Text style={styles.insightsSectionTitle}>Insights</Text>
+              <View style={styles.insightCard}>
+                <Text style={styles.insightText}>
+                  You made {transactions.filter((t) => t.optimal).length} optimal decisions ({transactions.length > 0 ? ((transactions.filter((t) => t.optimal).length / transactions.length) * 100).toFixed(0) : 0}%)
+                </Text>
+                {totalMissed > 0 && (
+                  <Text style={styles.insightText}>
+                    You could save an extra ${totalMissed.toFixed(2)} by following all recommendations
+                  </Text>
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -450,5 +480,39 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF5252',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#4A90E2',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

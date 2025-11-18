@@ -2,7 +2,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 
-const NearbyPlacesCard = ({ recommendations, onRefresh }) => {
+const NearbyPlacesCard = ({ recommendations, onRefresh, onRecommendationPress }) => {
   if (!recommendations || recommendations.length === 0) {
     return (
       <View style={styles.container}>
@@ -35,7 +35,12 @@ const NearbyPlacesCard = ({ recommendations, onRefresh }) => {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
         {recommendations.map((rec, index) => (
-          <View key={rec.place.place_id || index} style={styles.placeCard}>
+          <TouchableOpacity
+            key={rec.place.place_id || index}
+            style={styles.placeCard}
+            onPress={() => onRecommendationPress && onRecommendationPress(rec)}
+            activeOpacity={0.7}
+          >
             <View style={styles.placeHeader}>
               <Text style={styles.placeName} numberOfLines={1}>
                 {rec.place.name}
@@ -52,7 +57,7 @@ const NearbyPlacesCard = ({ recommendations, onRefresh }) => {
             <View style={styles.distanceRow}>
               <Text style={styles.distanceText}>{rec.place.distance_formatted}</Text>
               {rec.place.rating && (
-                <Text style={styles.rating}>★ {rec.place.rating.toFixed(1)}</Text>
+                <Text style={styles.rating}>{rec.place.rating.toFixed(1)}</Text>
               )}
             </View>
 
@@ -73,7 +78,11 @@ const NearbyPlacesCard = ({ recommendations, onRefresh }) => {
                 {rec.recommended_card.explanation}
               </Text>
             </View>
-          </View>
+
+            <View style={styles.tapHint}>
+              <Text style={styles.tapHintText}>Tap to add transaction</Text>
+            </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
     </View>
@@ -204,6 +213,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     lineHeight: 16,
+  },
+  tapHint: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    alignItems: 'center',
+  },
+  tapHintText: {
+    fontSize: 11,
+    color: '#4A90E2',
+    fontWeight: '600',
   },
   emptyState: {
     paddingVertical: 30,
