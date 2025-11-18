@@ -60,18 +60,13 @@ export default function TransactionScreen() {
       return;
     }
 
-    if (!userId) {
-      Alert.alert('Error', 'User not logged in. Please log in again.');
-      return;
-    }
-
     setLoading(true);
 
     try {
       console.log('Sending request to API...');
-
-      const response = await API.getRecommendation({
-        user_id: userId,
+      
+      const transactionData = {
+        user_id: 'user123',
         merchant: merchant.trim(),
         amount: parseFloat(amount),
         category: selectedCategory,

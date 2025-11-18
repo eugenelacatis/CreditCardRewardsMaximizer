@@ -45,6 +45,8 @@ services:
       start_period: 5s
     networks:
       - app-network
+    command: ["/bin/sh","-c","set -e; if [ -f /app/startup.sh ]; then sed -i 's/\\r$//' /app/startup.sh; chmod +x /app/startup.sh; exec /app/startup.sh; else echo 'startup.sh not found at /app'; exit 1; fi"]
+
 
   frontend:
     build:
@@ -58,6 +60,7 @@ services:
     environment:
       - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
       - REACT_NATIVE_PACKAGER_HOSTNAME=0.0.0.0
+      - EXPO_PUBLIC_API_URL=http://localhost:8000/api/v1
     volumes:
       - ./frontend:/app
       - /app/node_modules
