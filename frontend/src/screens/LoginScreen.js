@@ -8,7 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -22,6 +23,7 @@ export default function LoginScreen({ onLogin }) {
   const [fullName, setFullName] = useState('');
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [optimizationGoal, setOptimizationGoal] = useState('balanced');
 
   const handleLoginPress = async () => {
     if (!email || !password) {
@@ -73,7 +75,8 @@ export default function LoginScreen({ onLogin }) {
       const response = await API.signup({
         email: email.trim(),
         password: password,
-        full_name: fullName.trim()
+        full_name: fullName.trim(),
+        optimization_goal: optimizationGoal
       });
 
       // Store user data
@@ -108,7 +111,15 @@ export default function LoginScreen({ onLogin }) {
   const toggleMode = () => {
     setIsSignupMode(!isSignupMode);
     setFullName('');
+    setOptimizationGoal('balanced');
   };
+
+  const optimizationGoals = [
+    { value: 'cash_back', label: 'Cash Back', icon: 'cash-multiple', description: 'Maximize cash back rewards' },
+    { value: 'travel_points', label: 'Travel Points', icon: 'airplane', description: 'Maximize travel points & miles' },
+    { value: 'specific_discounts', label: 'Specific Discounts', icon: 'sale', description: 'Focus on category discounts' },
+    { value: 'balanced', label: 'Balanced', icon: 'scale-balance', description: 'Best overall value' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -116,13 +127,18 @@ export default function LoginScreen({ onLogin }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
       >
-        <View style={styles.header}>
-          <Icon name="wallet" size={60} color="#4A90E2" />
-          <Text style={styles.title}>Agentic Wallet</Text>
-          <Text style={styles.subtitle}>
-            {isSignupMode ? 'Create your account' : 'Sign in to continue'}
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Icon name="wallet" size={60} color="#4A90E2" />
+            <Text style={styles.title}>Agentic Wallet</Text>
+            <Text style={styles.subtitle}>
+              {isSignupMode ? 'Create your account' : 'Sign in to continue'}
+            </Text>
+          </View>
 
         <View style={styles.form}>
           {isSignupMode && (
@@ -156,8 +172,39 @@ export default function LoginScreen({ onLogin }) {
             editable={!loading}
           />
 
+          {isSignupMode && (
+            <View style={styles.goalSection}>
+              <Text style={styles.goalLabel}>Optimization Goal</Text>
+              <View style={styles.goalOptions}>
+                {optimizationGoals.map((goal) => (
+                  <TouchableOpacity
+                    key={goal.value}
+                    style={[
+                      styles.goalOption,
+                      optimizationGoal === goal.value && styles.goalOptionSelected
+                    ]}
+                    onPress={() => setOptimizationGoal(goal.value)}
+                    disabled={loading}
+                  >
+                    <Icon
+                      name={goal.icon}
+                      size={16}
+                      color={optimizationGoal === goal.value ? '#4A90E2' : '#666'}
+                    />
+                    <Text style={[
+                      styles.goalOptionText,
+                      optimizationGoal === goal.value && styles.goalOptionTextSelected
+                    ]}>
+                      {goal.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={[styles.button, loading && styles.buttonDisabled, isSignupMode && styles.buttonSignup]}
             onPress={isSignupMode ? handleSignupPress : handleLoginPress}
             disabled={loading}
           >
@@ -171,16 +218,17 @@ export default function LoginScreen({ onLogin }) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            {isSignupMode ? 'Already have an account?' : "Don't have an account?"}
-          </Text>
-          <TouchableOpacity onPress={toggleMode} disabled={loading}>
-            <Text style={styles.signupText}>
-              {isSignupMode ? 'Sign In' : 'Sign Up'}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              {isSignupMode ? 'Already have an account?' : "Don't have an account?"}
             </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity onPress={toggleMode} disabled={loading}>
+              <Text style={styles.signupText}>
+                {isSignupMode ? 'Sign In' : 'Sign Up'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -194,8 +242,12 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 30,
+    paddingVertical: 20,
   },
   header: {
     alignItems: 'center',
@@ -233,6 +285,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
+  buttonSignup: {
+    marginTop: 5,
+  },
   buttonDisabled: {
     backgroundColor: '#A0A0A0',
   },
@@ -255,5 +310,49 @@ const styles = StyleSheet.create({
     color: '#4A90E2',
     fontWeight: 'bold',
     marginLeft: 5,
+  },
+  goalSection: {
+    marginBottom: 8,
+  },
+  goalLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 5,
+  },
+  goalOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    justifyContent: 'space-between',
+  },
+  goalOption: {
+    flex: 1,
+    minWidth: '47%',
+    maxWidth: '48%',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  goalOptionSelected: {
+    borderColor: '#4A90E2',
+    backgroundColor: '#F0F7FF',
+  },
+  goalOptionText: {
+    fontSize: 9,
+    color: '#666',
+    marginTop: 2,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  goalOptionTextSelected: {
+    color: '#4A90E2',
+    fontWeight: '700',
   },
 });

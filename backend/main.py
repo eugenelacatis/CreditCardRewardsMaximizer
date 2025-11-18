@@ -225,6 +225,7 @@ class SignupRequest(BaseModel):
     password: str = Field(..., min_length=6, description="Password (minimum 6 characters)")
     full_name: str = Field(..., min_length=1, description="User's full name")
     phone: Optional[str] = Field(None, description="Phone number")
+    optimization_goal: Optional[OptimizationGoal] = Field(OptimizationGoal.BALANCED, description="Default optimization goal")
 
 
 class SigninRequest(BaseModel):
@@ -357,7 +358,8 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
             email=request.email,
             password_hash=password_hash,
             full_name=request.full_name,
-            phone=request.phone
+            phone=request.phone,
+            default_optimization_goal=OptimizationGoalEnum[request.optimization_goal.value.upper()]
         )
 
         db.add(new_user)
