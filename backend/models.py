@@ -103,6 +103,7 @@ class CreditCard(Base):
     
     # Card Status
     is_active = Column(Boolean, default=True)
+    is_library_card = Column(Boolean, default=False, nullable=False)
     activation_date = Column(DateTime)
     expiration_date = Column(DateTime)
     credit_limit = Column(Float)
@@ -122,6 +123,7 @@ class CreditCard(Base):
         Index('idx_card_user_id', 'user_id'),
         Index('idx_card_issuer', 'issuer'),
         Index('idx_card_is_active', 'is_active'),
+        Index('idx_card_is_library', 'is_library_card'),
         CheckConstraint('annual_fee >= 0', name='check_annual_fee_positive'),
         CheckConstraint('credit_limit >= 0', name='check_credit_limit_positive'),
     )

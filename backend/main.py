@@ -173,7 +173,9 @@ class CreditCardUpdateRequest(BaseModel):
     benefits: Optional[List[str]] = None
     credit_limit: Optional[float] = Field(None, ge=0)
 
-
+class AddCardFromLibraryRequest(BaseModel):
+    library_card_id: str
+    last_four_digits: Optional[str] = Field(default=None, min_length=4, max_length=4)
 # ============================================================================
 # USER CREDIT CARD SCHEMAS (User's owned cards)
 # ============================================================================

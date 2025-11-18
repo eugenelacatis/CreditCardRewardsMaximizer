@@ -211,7 +211,173 @@ def create_credit_cards_from_library(db: Session, user_id: str) -> List[CreditCa
     print(f"✅ Created {len(created_cards)} cards from library")
     return created_cards
 
+def get_library_cards(
+    db: Session,
+    issuer: Optional[str] = None,
+    best_for: Optional[str] = None,
+    annual_fee_max: Optional[float] = None,
+    skip: int = 0,
+    limit: int = 100
+) -> List[CreditCard]:
+    """
+    Get library cards with optional filters
+    
+    Args:
+        db: Database session
+        issuer: Filter by card issuer (e.g., "Chase", "American Express")
+        best_for: Filter by category (e.g., 'dining', 'travel', 'groceries')
+        annual_fee_max: Maximum annual fee
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return
+    
+    Returns:
+        List of CreditCard objects from the library
+    """
+    query = db.query(CreditCard).filter(CreditCard.is_library_card == True)
+    
+    # Apply filters
+    if issuer:
+        query = query.filter(CreditCard.issuer == issuer)
+    
+    if best_for:
+        # Filter cards where the specified category has higher rewards
+        # Cards are considered good for a category if:
+        # - Cash back rate > 1% OR
+        # - Points multiplier > 1x
+        # This uses PostgreSQL JSON operators
+        from sqlalchemy import cast, text
+        
+        # Build condition for cash_back_rate
+        cash_back_condition = text(
+            f"(cash_back_rate->>'{best_for}')::float > 0.01"
+        )
+        
+        # Build condition for points_multiplier
+        points_condition = text(
+            f"(points_multiplier->>'{best_for}')::float > 1.0"
+        )
+        
+        query = query.filter(
+            or_(
+                cash_back_condition,
+                points_condition
+            )
+        )
+    
+    if annual_fee_max is not None:
+        query = query.filter(CreditCard.annual_fee <= annual_fee_max)
+    
+    # Apply pagination and return
+    return query.offset(skip).limit(limit).all()
 
+
+def copy_library_card_to_user(
+    db: Session,
+    user_id: str,
+    library_card_id: str,
+    last_four_digits: Optional[str] = None
+) -> Optional[CreditCard]:
+    """
+    Copy a library card to a user's wallet
+    
+    This creates a new card record for the user based on a library card template.
+    The new card is NOT a library card itself.
+    
+    Args:
+        db: Database session
+        user_id: User ID who is adding the card
+        library_card_id: ID of the library card to copy
+        last_four_digits: Optional last 4 digits of the user's physical card
+    
+    Returns:
+        The newly created user card, or None if library card not found
+    """
+    # Get the library card
+    library_card = db.query(CreditCard).filter(
+        CreditCard.card_id == library_card_id,
+        CreditCard.is_library_card == True
+    ).first()
+    
+    if not library_card:
+        return None
+    
+    # Create a new card for the user based on the library card
+    user_card = CreditCard(
+        card_id=f"card_{uuid.uuid4().hex[:12]}",
+        user_id=user_id,
+        card_name=library_card.card_name,
+        issuer=library_card.issuer,
+        last_four_digits=last_four_digits,
+        cash_back_rate=library_card.cash_back_rate,
+        points_multiplier=library_card.points_multiplier,
+        annual_fee=library_card.annual_fee,
+        benefits=library_card.benefits,
+        sign_up_bonus=library_card.sign_up_bonus,
+        foreign_transaction_fee=library_card.foreign_transaction_fee,
+        is_library_card=False,  # This is a user's personal card, NOT a library card
+        is_active=True,
+        activation_date=datetime.utcnow()
+    )
+    
+    db.add(user_card)
+    db.commit()
+    db.refresh(user_card)
+    return user_card
+
+
+def delete_card(db: Session, card_id: str, user_id: str) -> tuple[bool, Optional[str]]:
+    """
+    Delete a credit card (only if it's not a library card)
+    
+    This function includes safety checks to:
+    1. Prevent deletion of library cards
+    2. Verify the card belongs to the requesting user
+    
+    Args:
+        db: Database session
+        card_id: Card ID to delete
+        user_id: User ID (for authorization check)
+    
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+        - (True, None) if deletion succeeded
+        - (False, "error message") if deletion failed
+    """
+    # Import get_card if not already imported
+    card = get_card(db, card_id)
+    
+    if not card:
+        return False, "Card not found"
+    
+    # CRITICAL: Prevent deletion of library cards
+    if card.is_library_card:
+        return False, "Cannot delete library cards"
+    
+    # Verify the card belongs to the user
+    if card.user_id != user_id:
+        return False, "Unauthorized: Card does not belong to this user"
+    
+    # Delete the card
+    db.delete(card)
+    db.commit()
+    return True, None
+
+
+# Helper function to check if a card is a library card
+def is_library_card(db: Session, card_id: str) -> bool:
+    """
+    Check if a card is a library card
+    
+    Args:
+        db: Database session
+        card_id: Card ID to check
+    
+    Returns:
+        True if the card is a library card, False otherwise
+    """
+    card = get_card(db, card_id)
+    return card.is_library_card if card else False
+    
 # ============================================================================
 # USER CREDIT CARD OPERATIONS (User's owned cards from library)
 # ============================================================================
@@ -226,6 +392,7 @@ def add_user_credit_card(
 ) -> Optional[UserCreditCard]:
     """
     Add a credit card from the library to a user's wallet.
+    If the card was previously removed (inactive), it will be reactivated.
 
     Args:
         db: Database session
@@ -236,7 +403,7 @@ def add_user_credit_card(
         credit_limit: User's credit limit for this card
 
     Returns:
-        UserCreditCard object or None if card already exists
+        UserCreditCard object or None if card not found in library
     """
     # Check if user already has this card
     existing = db.query(UserCreditCard).filter(
@@ -247,8 +414,27 @@ def add_user_credit_card(
     ).first()
 
     if existing:
-        print(f"⚠️  User already has this card")
-        return None
+        # If card exists but is inactive, reactivate it
+        if not existing.is_active:
+            print(f"✅ Reactivating previously removed card")
+            existing.is_active = True
+            existing.activation_date = datetime.utcnow()
+            
+            # Update optional fields if provided
+            if nickname:
+                existing.nickname = nickname
+            if last_four_digits:
+                existing.last_four_digits = last_four_digits
+            if credit_limit:
+                existing.credit_limit = credit_limit
+            
+            db.commit()
+            db.refresh(existing)
+            return existing
+        else:
+            # Card is already active
+            print(f"⚠️  User already has this card in their active wallet")
+            return None
 
     # Verify the card exists in the library
     card = get_card(db, card_id)
@@ -263,7 +449,8 @@ def add_user_credit_card(
         nickname=nickname,
         last_four_digits=last_four_digits,
         credit_limit=credit_limit,
-        is_active=True
+        is_active=True,
+        activation_date=datetime.utcnow()
     )
 
     db.add(user_card)
