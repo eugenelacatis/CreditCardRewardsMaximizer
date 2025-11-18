@@ -184,7 +184,7 @@ export default function CardsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await API.deleteWalletCard(card.userCardId, false); // Soft delete
+              await API.deleteWalletCard(card.userCardId, true); // Hard delete
               await fetchWalletCards();
               Alert.alert('Removed', 'Card removed from wallet');
             } catch (error) {
