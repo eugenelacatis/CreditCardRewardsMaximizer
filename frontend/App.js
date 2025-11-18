@@ -8,7 +8,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 // Import screens
 import HomeScreen from './src/screens/HomeScreen';
 import CardsScreen from './src/screens/CardsScreen';
-import CardLibraryScreen from './src/screens/CardLibraryScreen';
 import TransactionScreen from './src/screens/TransactionScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -16,19 +15,6 @@ import LoginScreen from './src/screens/LoginScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
-const CardsStack = createStackNavigator();
-
-/**
- * Stack Navigator for Cards section (CardsScreen + CardLibraryScreen)
- */
-function CardsStackNavigator() {
-  return (
-    <CardsStack.Navigator screenOptions={{ headerShown: false }}>
-      <CardsStack.Screen name="CardsMain" component={CardsScreen} />
-      <CardsStack.Screen name="CardLibrary" component={CardLibraryScreen} />
-    </CardsStack.Navigator>
-  );
-}
 
 /**
  * This component holds the main app navigation (the bottom tabs)
@@ -62,7 +48,7 @@ function MainTabNavigator({ onLogout }) {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Cards" component={CardsStackNavigator} />
+      <Tab.Screen name="Cards" component={CardsScreen} />
       <Tab.Screen
         name="Transaction"
         component={TransactionScreen}

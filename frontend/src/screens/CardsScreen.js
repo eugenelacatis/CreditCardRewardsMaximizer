@@ -6,19 +6,20 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Modal,
+  TextInput,
   Alert,
+  ScrollView,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API } from '../services/api';
-<<<<<<< HEAD
+
+// const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = "https://hip-wolves-yell.loca.lt/api/v1"
 
 export default function CardsScreen({ navigation, route }) {
-  const [USER_ID, setUserId] = useState(null);
-=======
-import axios from 'axios';
+  const USER_ID = route?.params?.userId || 'demo-user-123';
 
 const API_BASE_URL = 'http://10.0.0.222:8000';
 >>>>>>> cae5d2f2f118266d9490068b8bd8f79d42f4adc6
@@ -28,35 +29,9 @@ export default function CardsScreen() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
-<<<<<<< HEAD
-  // Load user ID from AsyncStorage on mount
-  useEffect(() => {
-    const loadUserId = async () => {
-      try {
-        const storedUserId = await AsyncStorage.getItem('userId');
-        if (storedUserId) {
-          setUserId(storedUserId);
-          console.log('✅ Loaded user ID from storage:', storedUserId);
-        } else {
-          // Fallback to route params or demo user
-          const routeUserId = route?.params?.userId;
-          if (routeUserId) {
-            setUserId(routeUserId);
-          } else {
-            console.warn('⚠️ No user ID found, using demo user');
-            setUserId('demo-user-123');
-          }
-        }
-      } catch (error) {
-        console.error('Error loading user ID:', error);
-        setUserId(route?.params?.userId || 'demo-user-123');
-      }
-    };
-    loadUserId();
-  }, [route?.params?.userId]);
-=======
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCard, setNewCard] = useState({
     name: '',
@@ -65,30 +40,23 @@ export default function CardsScreen() {
     last4: '',
   });
 
-  // Load user ID on mount
-  useEffect(() => {
-    const loadUserId = async () => {
-      const id = await AsyncStorage.getItem('userId');
-      setUserId(id);
-    };
-    loadUserId();
-  }, []);
->>>>>>> cae5d2f2f118266d9490068b8bd8f79d42f4adc6
+  const safeJson = async (res) => {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  };
 
   const apiCardToUi = useCallback((c) => {
     const rewardsText = Array.isArray(c?.benefits) && c.benefits.length > 0
       ? c.benefits.join(', ')
       : 'Standard rewards';
 
-    // Handle issuer - it might be a string or an object with .value
-    const issuerValue = typeof c?.issuer === 'string' 
-      ? c.issuer 
-      : c?.issuer?.value || 'Unknown';
-
     return {
       id: c?.card_id ?? String(Math.random()),
       name: c?.card_name ?? 'Card',
-      type: issuerValue,
+      type: c?.issuer ?? 'Unknown',
       rewards: rewardsText,
       cashBackRate: 0,
       pointsMultiplier: 0,
@@ -97,54 +65,29 @@ export default function CardsScreen() {
   }, []);
 
   const fetchCards = useCallback(async () => {
-<<<<<<< HEAD
-    if (!USER_ID) {
-      console.log('⏳ Waiting for user ID...');
-=======
-    if (!userId) {
-      setLoading(false);
->>>>>>> cae5d2f2f118266d9490068b8bd8f79d42f4adc6
-      return;
-    }
-
     setLoading(true);
     setErrorMsg(null);
     try {
-<<<<<<< HEAD
-      console.log('🃏 Fetching cards for user:', USER_ID);
-      // Use the centralized API service
-      const data = await API.getCards(USER_ID);
-      const list = Array.isArray(data) ? data : [];
-=======
-      const response = await API.getUserCards(userId);
-      const list = Array.isArray(response.data) ? response.data : [];
->>>>>>> cae5d2f2f118266d9490068b8bd8f79d42f4adc6
-      setCards(list.map(apiCardToUi));
-      setErrorMsg(null);
-    } catch (err) {
-      console.error('Error fetching cards:', err);
-<<<<<<< HEAD
-      // Handle different error types
-      const status = err?.response?.status;
-      if (status === 404) {
+      const res = await fetch(`${API_BASE}/api/v1/users/${encodeURIComponent(USER_ID)}/cards`);
+      if (!res.ok) {
         // Treat 404 as "no cards"/empty state
-        setCards([]);
-        setErrorMsg(null);
+        if (res.status === 404) {
+          setCards([]);
+          setErrorMsg(null);
+        } else {
+          const text = await res.text().catch(() => '');
+          setCards([]); // ensure safe empty state
+          setErrorMsg(text || `Failed to load cards (HTTP ${res.status})`);
+        }
       } else {
-        setCards([]);
-        const errorText = err?.response?.data?.detail || err?.message || 'Network error while loading cards. Pull to retry.';
-        console.error('Cards fetch error:', errorText);
-        setErrorMsg(errorText);
-=======
-      setCards([]);
-
-      // Check if it's a 404 (user not found or no cards)
-      if (err.response?.status === 404) {
-        setErrorMsg(null); // No error for empty state
-      } else {
-        setErrorMsg('Could not load cards. Pull down to retry.');
->>>>>>> cae5d2f2f118266d9490068b8bd8f79d42f4adc6
+        const data = await safeJson(res);
+        const list = Array.isArray(data) ? data : [];
+        setCards(list.map(apiCardToUi));
       }
+    } catch (err) {
+      // Network or unexpected error: still render with empty list
+      setCards([]);
+      setErrorMsg('Network error while loading cards. Pull to retry.');
     } finally {
       setLoading(false);
     }
@@ -159,31 +102,13 @@ export default function CardsScreen() {
     }
   }, [fetchCards]);
 
-  // Fetch cards when USER_ID is available
   useEffect(() => {
-    if (USER_ID) {
-      fetchCards();
-    }
-  }, [USER_ID, fetchCards]);
+    fetchCards();
+  }, [fetchCards]);
 
-<<<<<<< HEAD
-  // Refresh cards when screen comes into focus (e.g., returning from CardLibraryScreen)
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchCards();
-    });
-    return unsubscribe;
-  }, [navigation, fetchCards]);
-
-  const handleNavigateToLibrary = useCallback(() => {
-    navigation.navigate('CardLibrary', {
-      userId: USER_ID,
-      onCardAdded: fetchCards,
-    });
-  }, [navigation, USER_ID, fetchCards]);
-=======
-    if (!userId) {
-      Alert.alert('Error', 'User not logged in. Please log in again.');
+  const handleAddCard = useCallback(async () => {
+    if (!newCard.name.trim()) {
+      Alert.alert('Error', 'Please enter a card name');
       return;
     }
 
@@ -202,15 +127,21 @@ export default function CardsScreen() {
         credit_limit: null,
       };
 
-      const res = await axios.post(
-        `${API_BASE_URL}/api/v1/cards?user_id=${encodeURIComponent(userId)}`,
-        payload,
-        {
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      const res = await fetch(`${API_BASE}/api/v1/cards?user_id=${encodeURIComponent(USER_ID)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-      const created = res.data;
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        // keep modal open; show friendly error
+        Alert.alert('Error', text || 'Could not add the card.');
+        return;
+        // Do not throw; we want to keep UI responsive
+      }
+
+      const created = await safeJson(res);
       if (!created || typeof created !== 'object') {
         Alert.alert('Error', 'Unexpected server response.');
         return;
@@ -221,14 +152,12 @@ export default function CardsScreen() {
       setShowAddModal(false);
       setNewCard({ name: '', type: 'Visa', rewards: '', last4: '' });
       Alert.alert('Success', `${uiCard.name} added to your wallet!`);
-    } catch (error) {
-      console.error('Error adding card:', error);
-      Alert.alert('Error', error.response?.data?.detail || 'Could not add the card.');
+    } catch {
+      Alert.alert('Error', 'Network error while adding the card.');
     } finally {
       setSubmitting(false);
     }
-  }, [userId, newCard, apiCardToUi]);
->>>>>>> cae5d2f2f118266d9490068b8bd8f79d42f4adc6
+  }, [USER_ID, newCard, apiCardToUi]);
 
   const handleDeleteCard = useCallback((cardId) => {
     Alert.alert(
@@ -241,23 +170,19 @@ export default function CardsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-<<<<<<< HEAD
-              await API.deleteCard(cardId);
-              setCards(prev => prev.filter(c => c.id !== cardId));
-              Alert.alert('Removed', 'Card has been deactivated.');
-            } catch (err) {
-              const errorText = err.response?.data?.detail || err.message || 'Could not delete the card.';
-              Alert.alert('Error', errorText);
-=======
-              await axios.delete(`${API_BASE_URL}/api/v1/cards/${encodeURIComponent(cardId)}`, {
+              const res = await fetch(`${API_BASE}/api/v1/cards/${encodeURIComponent(cardId)}`, {
+                method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
               });
+              if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                Alert.alert('Error', text || 'Could not delete the card.');
+                return;
+              }
               setCards(prev => prev.filter(c => c.id !== cardId));
               Alert.alert('Removed', 'Card has been deactivated.');
-            } catch (error) {
-              console.error('Error deleting card:', error);
-              Alert.alert('Error', error.response?.data?.detail || 'Could not delete the card.');
->>>>>>> cae5d2f2f118266d9490068b8bd8f79d42f4adc6
+            } catch {
+              Alert.alert('Error', 'Network error while deleting the card.');
             }
           },
         },
@@ -290,7 +215,7 @@ export default function CardsScreen() {
       </Text>
       <TouchableOpacity 
         style={styles.emptyButton}
-        onPress={handleNavigateToLibrary}
+        onPress={() => setShowAddModal(true)}
       >
         <Text style={styles.emptyButtonText}>+ Add Your First Card</Text>
       </TouchableOpacity>
@@ -312,7 +237,7 @@ export default function CardsScreen() {
         </View>
         <TouchableOpacity 
           style={styles.addButton}
-          onPress={handleNavigateToLibrary}
+          onPress={() => setShowAddModal(true)}
         >
           <Text style={styles.addButtonText}>+ Add Card</Text>
         </TouchableOpacity>
@@ -345,6 +270,115 @@ export default function CardsScreen() {
         />
       )}
 
+      {/* Add Card Modal */}
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add New Card</Text>
+                <TouchableOpacity 
+                  onPress={() => setShowAddModal(false)}
+                  style={styles.closeButton}
+                  disabled={submitting}
+                >
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Card Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Chase Sapphire Preferred"
+                  value={newCard.name}
+                  onChangeText={(text) => setNewCard({ ...newCard, name: text })}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Issuer</Text>
+                <View style={styles.cardTypeRow}>
+                  {['Visa', 'Mastercard', 'Amex', 'Discover'].map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.typeButton,
+                        newCard.type === type && styles.typeButtonActive,
+                      ]}
+                      onPress={() => setNewCard({ ...newCard, type })}
+                      disabled={submitting}
+                    >
+                      <Text
+                        style={[
+                          styles.typeButtonText,
+                          newCard.type === type && styles.typeButtonTextActive,
+                        ]}
+                      >
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Benefits (comma-separated, optional)</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="e.g. 3x travel, 2x dining"
+                  value={newCard.rewards}
+                  onChangeText={(text) => setNewCard({ ...newCard, rewards: text })}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Last 4 Digits (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 1234"
+                  value={newCard.last4}
+                  onChangeText={(text) => setNewCard({ ...newCard, last4: text })}
+                  keyboardType="number-pad"
+                  maxLength={4}
+                />
+              </View>
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoText}>
+                  💡 Tip: You can edit reward categories later in a detail screen.
+                </Text>
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.submitButton, submitting && { opacity: 0.6 }]}
+                onPress={handleAddCard}
+                disabled={submitting}
+              >
+                <Text style={styles.submitButtonText}>
+                  {submitting ? 'Adding…' : 'Add Card'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowAddModal(false)}
+                disabled={submitting}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {!loading && cards.length > 0 && (
         <View style={styles.helpBox}>
@@ -397,6 +431,29 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   emptyButton: { backgroundColor: '#4A90E2', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   emptyButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#333' },
+  closeButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
+  closeButtonText: { fontSize: 20, color: '#666' },
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 8 },
+  input: { backgroundColor: '#F5F7FA', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 8, padding: 12, fontSize: 16 },
+  textArea: { height: 80, textAlignVertical: 'top' },
+  cardTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typeButton: { flex: 1, minWidth: '45%', backgroundColor: '#F5F7FA', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 8, padding: 12, alignItems: 'center' },
+  typeButtonActive: { backgroundColor: '#4A90E2', borderColor: '#4A90E2' },
+  typeButtonText: { fontSize: 14, color: '#666', fontWeight: '500' },
+  typeButtonTextActive: { color: '#fff' },
+  infoBox: { backgroundColor: '#FFF3CD', padding: 12, borderRadius: 8, marginBottom: 20 },
+  infoText: { fontSize: 14, color: '#856404' },
+  submitButton: { backgroundColor: '#4A90E2', borderRadius: 8, padding: 16, alignItems: 'center', marginBottom: 12 },
+  submitButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  cancelButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 8, padding: 16, alignItems: 'center' },
+  cancelButtonText: { color: '#666', fontSize: 16, fontWeight: '600' },
   helpBox: { padding: 16, backgroundColor: '#E3F2FD', margin: 20, borderRadius: 8 },
   helpText: { fontSize: 14, color: '#1976D2', textAlign: 'center' },
 });
