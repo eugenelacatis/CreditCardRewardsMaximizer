@@ -64,15 +64,16 @@ export default function TransactionScreen() {
 
     try {
       console.log('Sending request to API...');
-      
+
       const transactionData = {
         user_id: 'user123',
         merchant: merchant.trim(),
         amount: parseFloat(amount),
         category: selectedCategory,
         optimization_goal: selectedGoal,
-      });
+      };
 
+      const response = await API.getRecommendation(transactionData);
       console.log('API Response:', response.data);
 
       setRecommendation(response.data);
