@@ -28,6 +28,9 @@ export default function HomeScreen({ navigation }) {
   const [selectedRecommendation, setSelectedRecommendation] = useState(null);
   const [transactionAmount, setTransactionAmount] = useState('');
   const [creatingTransaction, setCreatingTransaction] = useState(false);
+  const [userCards, setUserCards] = useState([]);
+  const [selectedCard, setSelectedCard] = useState(null);
+  const [loadingCards, setLoadingCards] = useState(false);
 
   const fetchUserData = async () => {
     try {
@@ -143,10 +146,35 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  const handleRecommendationPress = (recommendation) => {
+  const handleRecommendationPress = async (recommendation) => {
     setSelectedRecommendation(recommendation);
     setTransactionAmount('');
+    setSelectedCard(null);
     setModalVisible(true);
+
+    // Fetch user's cards for selection
+    setLoadingCards(true);
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        const response = await API.getWalletCards(userId);
+        const cards = Array.isArray(response.data) ? response.data : [];
+        setUserCards(cards);
+
+        // Pre-select the recommended card if it exists in user's wallet
+        const recommendedCardId = recommendation.recommended_card.card_id;
+        const matchingCard = cards.find(c => c.card_id === recommendedCardId);
+        if (matchingCard) {
+          setSelectedCard(matchingCard);
+        } else if (cards.length > 0) {
+          setSelectedCard(cards[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user cards:', error);
+    } finally {
+      setLoadingCards(false);
+    }
   };
 
   // Map place categories to valid transaction categories
@@ -178,9 +206,53 @@ export default function HomeScreen({ navigation }) {
     return categoryMap[lowerCategory] || 'other';
   };
 
+  // Calculate rewards based on card and category
+  const calculateReward = (card, category, amount) => {
+    if (!card || !amount) return 0;
+
+    // Get cash back rate and points multiplier for this category
+    const cashBackRates = card.cash_back_rate || {};
+    const pointsMultipliers = card.points_multiplier || {};
+
+    // Log for debugging
+    console.log('calculateReward called:');
+    console.log('  Card:', card.card_name);
+    console.log('  Category:', category);
+    console.log('  Amount:', amount);
+    console.log('  Cash back rates:', JSON.stringify(cashBackRates));
+    console.log('  Points multipliers:', JSON.stringify(pointsMultipliers));
+
+    // Calculate cash back reward
+    let cashBackRate = cashBackRates[category] || cashBackRates[category.toLowerCase()] ||
+                       cashBackRates['default'] || cashBackRates['other'] || 0;
+    const cashBackReward = amount * cashBackRate;
+
+    // Calculate points reward (convert points to dollar value)
+    // Typical point value is ~1 cent per point, but premium cards like Chase can be 1.5-2 cents
+    const POINT_VALUE = 0.01; // 1 cent per point
+    let pointsMultiplier = pointsMultipliers[category] || pointsMultipliers[category.toLowerCase()] ||
+                          pointsMultipliers['default'] || pointsMultipliers['other'] || 0;
+    const pointsEarned = amount * pointsMultiplier;
+    const pointsReward = pointsEarned * POINT_VALUE;
+
+    // Total reward is the higher of cash back or points value
+    const totalReward = Math.max(cashBackReward, pointsReward);
+
+    console.log('  Cash back rate:', cashBackRate, '-> $', cashBackReward.toFixed(2));
+    console.log('  Points multiplier:', pointsMultiplier, '-> pts:', pointsEarned.toFixed(0), '-> $', pointsReward.toFixed(2));
+    console.log('  Total reward:', totalReward.toFixed(2));
+
+    return totalReward;
+  };
+
   const handleCreateTransaction = async () => {
     if (!transactionAmount || parseFloat(transactionAmount) <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+      return;
+    }
+
+    if (!selectedCard) {
+      Alert.alert('Select Card', 'Please select a card to use for this transaction');
       return;
     }
 
@@ -195,24 +267,29 @@ export default function HomeScreen({ navigation }) {
       const amount = parseFloat(transactionAmount);
       const recommendation = selectedRecommendation;
 
-      // Calculate rewards based on the expected reward ratio
-      const rewardRate = recommendation.expected_reward / 50; // API uses $50 as default
-      const totalReward = amount * rewardRate;
-
       // Map the place category to a valid transaction category
       const transactionCategory = mapPlaceCategoryToTransactionCategory(recommendation.place.category);
+
+      // Calculate rewards based on the selected card's rates
+      const totalReward = calculateReward(selectedCard, transactionCategory, amount);
+
+      // Calculate optimal reward (what they would have gotten with recommended card)
+      const recommendedCard = userCards.find(c => c.card_id === recommendation.recommended_card.card_id);
+      const optimalReward = recommendedCard
+        ? calculateReward(recommendedCard, transactionCategory, amount)
+        : totalReward;
 
       const transactionData = {
         user_id: userId,
         merchant: recommendation.place.name,
         amount: amount,
         category: transactionCategory,
-        card_used_id: recommendation.recommended_card.card_id,
+        card_used_id: selectedCard.card_id,
         recommended_card_id: recommendation.recommended_card.card_id,
         optimization_goal: 'cash_back',
         location: recommendation.place.address,
         total_value_earned: totalReward,
-        optimal_value: totalReward,
+        optimal_value: optimalReward,
         recommendation_explanation: recommendation.recommended_card.explanation,
         confidence_score: 0.95
       };
@@ -223,13 +300,16 @@ export default function HomeScreen({ navigation }) {
       setModalVisible(false);
       setSelectedRecommendation(null);
       setTransactionAmount('');
+      setSelectedCard(null);
+      setUserCards([]);
 
       // Refresh stats to show updated totals
       await fetchUserData();
 
+      const isOptimal = selectedCard.card_id === recommendation.recommended_card.card_id;
       Alert.alert(
         'Transaction Added!',
-        `Successfully recorded $${amount.toFixed(2)} at ${recommendation.place.name}.\nRewards earned: $${totalReward.toFixed(2)}`,
+        `Successfully recorded $${amount.toFixed(2)} at ${recommendation.place.name}.\nRewards earned: $${totalReward.toFixed(2)}${!isOptimal ? `\n\nTip: Using ${recommendation.recommended_card.card_name} would have earned $${optimalReward.toFixed(2)}` : ''}`,
         [{ text: 'OK' }]
       );
     } catch (error) {
@@ -377,11 +457,39 @@ export default function HomeScreen({ navigation }) {
                   </Text>
                 </View>
 
-                <View style={styles.modalCardInfo}>
-                  <Text style={styles.modalCardLabel}>Using:</Text>
-                  <Text style={styles.modalCardName}>
-                    {selectedRecommendation.recommended_card.card_name}
-                  </Text>
+                <View style={styles.modalCardSection}>
+                  <Text style={styles.modalSectionLabel}>Select Card Used:</Text>
+                  {loadingCards ? (
+                    <ActivityIndicator size="small" color="#4A90E2" style={{ marginVertical: 10 }} />
+                  ) : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardScrollView}>
+                      {userCards.map((card) => {
+                        const isRecommended = card.card_id === selectedRecommendation.recommended_card.card_id;
+                        const isSelected = selectedCard && selectedCard.card_id === card.card_id;
+                        return (
+                          <TouchableOpacity
+                            key={card.user_card_id || card.card_id}
+                            style={[
+                              styles.cardOption,
+                              isSelected && styles.cardOptionSelected,
+                              isRecommended && styles.cardOptionRecommended
+                            ]}
+                            onPress={() => setSelectedCard(card)}
+                          >
+                            <Text style={[
+                              styles.cardOptionName,
+                              isSelected && styles.cardOptionNameSelected
+                            ]} numberOfLines={1}>
+                              {card.card_name}
+                            </Text>
+                            {isRecommended && (
+                              <Text style={styles.recommendedBadge}>Recommended</Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  )}
                 </View>
 
                 <View style={styles.modalInputContainer}>
@@ -399,11 +507,15 @@ export default function HomeScreen({ navigation }) {
                   </View>
                 </View>
 
-                {transactionAmount && parseFloat(transactionAmount) > 0 && (
+                {transactionAmount && parseFloat(transactionAmount) > 0 && selectedCard && (
                   <View style={styles.modalRewardPreview}>
                     <Text style={styles.modalRewardLabel}>Estimated Rewards:</Text>
                     <Text style={styles.modalRewardAmount}>
-                      ${((parseFloat(transactionAmount) * selectedRecommendation.expected_reward) / 50).toFixed(2)}
+                      ${calculateReward(
+                        selectedCard,
+                        mapPlaceCategoryToTransactionCategory(selectedRecommendation.place.category),
+                        parseFloat(transactionAmount)
+                      ).toFixed(2)}
                     </Text>
                   </View>
                 )}
@@ -415,6 +527,8 @@ export default function HomeScreen({ navigation }) {
                       setModalVisible(false);
                       setSelectedRecommendation(null);
                       setTransactionAmount('');
+                      setSelectedCard(null);
+                      setUserCards([]);
                     }}
                   >
                     <Text style={styles.modalCancelButtonText}>Cancel</Text>
@@ -677,6 +791,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textTransform: 'capitalize',
+  },
+  modalCardSection: {
+    marginBottom: 15,
+  },
+  modalSectionLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+    fontWeight: '500',
+  },
+  cardScrollView: {
+    marginHorizontal: -5,
+  },
+  cardOption: {
+    backgroundColor: '#F5F7FA',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginHorizontal: 5,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  cardOptionSelected: {
+    borderColor: '#4A90E2',
+    backgroundColor: '#E3F2FD',
+  },
+  cardOptionRecommended: {
+    borderColor: '#4CAF50',
+  },
+  cardOptionName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  cardOptionNameSelected: {
+    color: '#4A90E2',
+  },
+  recommendedBadge: {
+    fontSize: 10,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginTop: 4,
   },
   modalCardInfo: {
     flexDirection: 'row',
