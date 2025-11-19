@@ -16,8 +16,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
 
-// The 'onLogin' prop is passed down from App.js
-export default function LoginScreen({ onLogin }) {
+// The 'onLogin' and 'onBack' props are passed down from App.js
+export default function LoginScreen({ onLogin, onBack }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -132,6 +132,12 @@ export default function LoginScreen({ onLogin }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack} disabled={loading}>
+              <Icon name="arrow-left" size={24} color="#4A90E2" />
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+          )}
           <View style={styles.header}>
             <Icon name="wallet" size={60} color="#4A90E2" />
             <Text style={styles.title}>Agentic Wallet</Text>
@@ -248,6 +254,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 30,
     paddingVertical: 20,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#4A90E2',
+    marginLeft: 4,
+    fontWeight: '500',
   },
   header: {
     alignItems: 'center',

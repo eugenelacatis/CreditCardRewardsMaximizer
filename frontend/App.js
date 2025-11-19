@@ -12,6 +12,7 @@ import TransactionScreen from './src/screens/TransactionScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import LandingScreen from './src/screens/LandingScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -82,16 +83,21 @@ function MainTabNavigator({ onLogout }) {
  */
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
 
   const handleLogin = () => {
     setIsLoggedIn(true);
+    setShowLanding(false);
   };
 
-  // --- ADDED THIS FUNCTION ---
   const handleLogout = () => {
     setIsLoggedIn(false);
+    setShowLanding(true);
   };
-  // ---------------------------
+
+  const handleSkipToLogin = () => {
+    setShowLanding(false);
+  };
 
   return (
     <SafeAreaProvider>
@@ -99,14 +105,29 @@ export default function App() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {isLoggedIn ? (
             // User is logged in: Show the main app (Tab Navigator)
-            // --- MODIFIED THIS LINE to pass 'handleLogout' ---
             <Stack.Screen name="MainApp">
               {(props) => <MainTabNavigator {...props} onLogout={handleLogout} />}
             </Stack.Screen>
+          ) : showLanding ? (
+            // First time user: Show the Landing screen
+            <Stack.Screen name="Landing">
+              {(props) => (
+                <LandingScreen
+                  {...props}
+                  onSkipToLogin={handleSkipToLogin}
+                />
+              )}
+            </Stack.Screen>
           ) : (
-            // User is not logged in: Show the Login screen
+            // User wants to login: Show the Login screen
             <Stack.Screen name="Login">
-              {(props) => <LoginScreen {...props} onLogin={handleLogin} />}
+              {(props) => (
+                <LoginScreen
+                  {...props}
+                  onLogin={handleLogin}
+                  onBack={() => setShowLanding(true)}
+                />
+              )}
             </Stack.Screen>
           )}
         </Stack.Navigator>

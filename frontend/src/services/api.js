@@ -229,20 +229,22 @@ export const API = {
     }
   },
 
-  getLocationBasedRecommendations: async (userId, latitude, longitude, radius = 2000) => {
+  getLocationBasedRecommendations: async (userId, latitude, longitude, radius = 2000, amount = 50.0) => {
     console.log('');
     console.log('═══════════════════════════════');
     console.log('🚀 API.getLocationBasedRecommendations called');
     console.log('═══════════════════════════════');
     console.log('User ID:', userId);
     console.log('Location:', { latitude, longitude, radius });
+    console.log('Amount:', amount);
 
     try {
       const response = await apiClient.post('/location/recommendations', {
         user_id: userId,
         latitude,
         longitude,
-        radius
+        radius,
+        amount
       });
       console.log('✅ Location-based recommendations fetched:', response.data.top_recommendations.length, 'recommendations');
       return response;

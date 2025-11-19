@@ -121,7 +121,7 @@ export default function HomeScreen({ navigation }) {
 
       console.log('Current location:', location);
 
-      // Fetch nearby recommendations
+      // Fetch nearby recommendations (default $50 for estimates)
       const response = await API.getLocationBasedRecommendations(
         userId,
         location.latitude,
@@ -180,26 +180,38 @@ export default function HomeScreen({ navigation }) {
   // Map place categories to valid transaction categories
   const mapPlaceCategoryToTransactionCategory = (placeCategory) => {
     const categoryMap = {
+      // Dining categories
+      'dining': 'dining',
       'restaurant': 'dining',
       'cafe': 'dining',
       'bar': 'dining',
       'fast_food': 'dining',
       'food': 'dining',
+      // Groceries categories
+      'groceries': 'groceries',
       'supermarket': 'groceries',
       'grocery': 'groceries',
       'convenience': 'groceries',
+      // Gas categories
+      'gas': 'gas',
       'fuel': 'gas',
       'gas_station': 'gas',
+      // Entertainment categories
+      'entertainment': 'entertainment',
       'cinema': 'entertainment',
       'theatre': 'entertainment',
-      'entertainment': 'entertainment',
-      'hotel': 'travel',
+      // Travel categories
       'travel': 'travel',
+      'hotel': 'travel',
       'airport': 'travel',
+      // Shopping categories
+      'shopping': 'shopping',
       'shop': 'shopping',
       'mall': 'shopping',
       'store': 'shopping',
       'retail': 'shopping',
+      // Other
+      'other': 'other',
     };
 
     const lowerCategory = placeCategory.toLowerCase();
@@ -228,8 +240,8 @@ export default function HomeScreen({ navigation }) {
     const cashBackReward = amount * cashBackRate;
 
     // Calculate points reward (convert points to dollar value)
-    // Typical point value is ~1 cent per point, but premium cards like Chase can be 1.5-2 cents
-    const POINT_VALUE = 0.01; // 1 cent per point
+    // Using 1.5 cents per point to match backend calculation
+    const POINT_VALUE = 0.015; // 1.5 cents per point
     let pointsMultiplier = pointsMultipliers[category] || pointsMultipliers[category.toLowerCase()] ||
                           pointsMultipliers['default'] || pointsMultipliers['other'] || 0;
     const pointsEarned = amount * pointsMultiplier;
@@ -386,23 +398,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
-        {!loading && stats.total_transactions > 0 && (
-          <View style={styles.insightCard}>
-            <Text style={styles.insightTitle}>📊 Your Performance</Text>
-            <Text style={styles.insightText}>
-              Total Spent: ${stats.total_spent.toFixed(2)}
-            </Text>
-            <Text style={styles.insightText}>
-              Optimization Rate: {(stats.optimization_rate * 100).toFixed(1)}%
-            </Text>
-            {stats.missed_value > 0 && (
-              <Text style={[styles.insightText, { color: '#FF9800' }]}>
-                Potential Savings: ${stats.missed_value.toFixed(2)}
-              </Text>
-            )}
-          </View>
-        )}
-
         {/* Location-based recommendations */}
         {loadingLocation && (
           <View style={styles.locationLoadingCard}>
@@ -429,6 +424,18 @@ export default function HomeScreen({ navigation }) {
             onRefresh={requestLocationPermissionAndFetchRecommendations}
             onRecommendationPress={handleRecommendationPress}
           />
+        )}
+
+        {!loading && stats.total_transactions > 0 && (
+          <View style={styles.insightCard}>
+            <Text style={styles.insightTitle}>📊 Your Performance</Text>
+            <Text style={styles.insightText}>
+              Total Spent: ${stats.total_spent.toFixed(2)}
+            </Text>
+            <Text style={styles.insightText}>
+              Optimization Rate: {stats.optimization_rate.toFixed(0)}%
+            </Text>
+          </View>
         )}
       </ScrollView>
 

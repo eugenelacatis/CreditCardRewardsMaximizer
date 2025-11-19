@@ -201,71 +201,115 @@ Card: {card['card_name']} ({card['issuer']})
         return "\n".join(formatted)
     
     def calculate_card_value(
-        self, 
-        card: Dict, 
-        amount: float, 
-        category: str, 
+        self,
+        card: Dict,
+        amount: float,
+        category: str,
         goal: str
     ) -> Tuple[float, Dict]:
         """
         Calculate weighted value for a card based on optimization goal
-        
+
         Args:
             card: Card dictionary with rewards structure
             amount: Transaction amount
             category: Transaction category
             goal: Optimization goal (cash_back, travel_points, balanced, specific_discounts)
-            
+
         Returns:
             Tuple of (total_value, breakdown_dict)
         """
         category_key = category.lower() if isinstance(category, str) else category
-        
+
         # Get rewards for this category
-        cash_back_rate = card.get('cash_back_rate', {}).get(category_key, 
+        cash_back_rate = card.get('cash_back_rate', {}).get(category_key,
                         card.get('cash_back_rate', {}).get('other', 0))
         points_mult = card.get('points_multiplier', {}).get(category_key,
                      card.get('points_multiplier', {}).get('other', 0))
-        
+
         # Calculate raw values
         cash_back = amount * cash_back_rate
         points = amount * points_mult
         points_value = points * 0.015  # 1 point = $0.015
-        benefits_count = len(card.get('benefits', []))
-        benefits_value = benefits_count * 2.0  # Each benefit worth ~$2
-        
+
+        # Calculate category-relevant benefits value
+        # Benefits should only contribute if they're relevant to the category
+        benefits = card.get('benefits', [])
+        benefits_count = len(benefits)
+
+        # Map categories to relevant benefit keywords
+        category_benefit_keywords = {
+            'dining': ['dining', 'restaurant', 'food', 'doordash', 'grubhub', 'ubereats'],
+            'groceries': ['grocery', 'groceries', 'supermarket', 'whole foods', 'instacart'],
+            'gas': ['gas', 'fuel', 'station'],
+            'travel': ['travel', 'airline', 'hotel', 'flight', 'lounge', 'tsa', 'global entry', 'rental'],
+            'entertainment': ['entertainment', 'streaming', 'movie', 'spotify', 'netflix', 'hulu'],
+            'shopping': ['shopping', 'retail', 'purchase protection', 'extended warranty', 'return protection'],
+            'other': []
+        }
+
+        # Count benefits relevant to this category
+        relevant_keywords = category_benefit_keywords.get(category_key, [])
+        relevant_benefits = 0
+        if relevant_keywords:
+            for benefit in benefits:
+                benefit_lower = benefit.lower()
+                if any(keyword in benefit_lower for keyword in relevant_keywords):
+                    relevant_benefits += 1
+
+        # Benefits value based on relevance to category
+        # Benefits should have minimal impact - rewards rates should drive decisions
+        # Only relevant benefits contribute, and at a small fixed value
+        relevant_benefits_value = relevant_benefits * 0.10  # $0.10 per relevant benefit
+        other_benefits_value = (benefits_count - relevant_benefits) * 0.01  # $0.01 per irrelevant benefit
+        benefits_value = relevant_benefits_value + other_benefits_value
+
         # Define weights based on optimization goal
+        # Strong differentiation to ensure goal drives card selection
         if goal == "cash_back":
-            weights = {"cash": 1.0, "points": 0.1, "benefits": 0.5}
+            # Heavily favor cash back cards, almost ignore points
+            weights = {"cash": 1.0, "points": 0.05, "benefits": 0.2}
         elif goal == "travel_points":
-            weights = {"cash": 0.1, "points": 1.0, "benefits": 0.5}
+            # Heavily favor points cards, almost ignore cash back
+            weights = {"cash": 0.05, "points": 1.0, "benefits": 0.2}
         elif goal == "specific_discounts":
-            weights = {"cash": 0.3, "points": 0.3, "benefits": 2.5}  # 2.5x for benefits
+            # Focus on benefits/discounts
+            weights = {"cash": 0.3, "points": 0.3, "benefits": 1.5}
         elif goal == "balanced":
-            weights = {"cash": 0.5, "points": 0.5, "benefits": 0.5}
+            # Equal weight to both cash and points
+            weights = {"cash": 0.5, "points": 0.5, "benefits": 0.2}
         else:
             # Default to balanced
-            weights = {"cash": 0.5, "points": 0.5, "benefits": 0.5}
+            weights = {"cash": 0.5, "points": 0.5, "benefits": 0.2}
             logger.warning(f"Unknown optimization goal: {goal}, using balanced weights")
-        
+
         # Calculate weighted total value
         total_value = (
             weights["cash"] * cash_back +
             weights["points"] * points_value +
             weights["benefits"] * benefits_value
         )
-        
+
+        # Debug logging to understand card scoring
+        logger.info(f"Card: {card.get('card_name')} | Category: {category_key} | Goal: {goal}")
+        logger.info(f"  Cash back rate: {cash_back_rate} -> ${cash_back:.2f}")
+        logger.info(f"  Points mult: {points_mult}x -> {points:.0f} pts (${points_value:.2f})")
+        logger.info(f"  Benefits: {benefits_count} total, {relevant_benefits} relevant -> ${benefits_value:.2f}")
+        logger.info(f"  Weights: cash={weights['cash']}, points={weights['points']}, benefits={weights['benefits']}")
+        logger.info(f"  Total value: ${total_value:.4f}")
+
         # Return value and breakdown for explanation
         breakdown = {
             "cash_back": cash_back,
             "points": points,
             "points_value": points_value,
             "benefits_count": benefits_count,
+            "relevant_benefits": relevant_benefits,
             "benefits_value": benefits_value,
             "weights": weights,
             "total_value": total_value
         }
-        
+
         return total_value, breakdown
     
     def get_recommendation(self, transaction_data: Dict, user_cards: List[Dict]) -> Dict:
@@ -398,6 +442,7 @@ Rank #{i}: {card['card_name']} ({card['issuer']})
             ai_explanation
         )
         
+
         # Track metrics
         duration = time.time() - start_time
         track_ai_request(
@@ -415,12 +460,19 @@ Rank #{i}: {card['card_name']} ({card['issuer']})
             'duration_ms': round(duration * 1000, 2)
         })
 
+        logger.info(f"Recommendation complete: {best_card['card_name']} - ${best_card_data['value']:.2f}")
+        
+        # Calculate the actual reward (not the weighted score)
+        # Actual reward is the higher of cash back or points value
+        actual_reward = max(best_breakdown['cash_back'], best_breakdown['points_value'])
+
+
         # Build final response
         return {
             "recommended_card": {
                 "card_id": best_card['card_id'],
                 "card_name": best_card['card_name'],
-                "expected_value": round(best_card_data['value'], 2),
+                "expected_value": round(actual_reward, 2),  # Actual reward, not weighted score
                 "cash_back_earned": round(best_breakdown['cash_back'], 2),
                 "points_earned": round(best_breakdown['points'], 2),
                 "applicable_benefits": best_card.get('benefits', [])[:2],
@@ -428,8 +480,8 @@ Rank #{i}: {card['card_name']} ({card['issuer']})
                 "confidence_score": 0.95  # Higher confidence with calculation
             },
             "alternative_cards": self._build_alternatives_from_scores(card_scores[1:3]),
-            "optimization_summary": f"Best choice for {transaction_data['optimization_goal'].replace('_', ' ')}: {best_card['card_name']} (${best_card_data['value']:.2f} value)",
-            "total_savings": round(best_card_data['value'], 2)
+            "optimization_summary": f"Best choice for {transaction_data['optimization_goal'].replace('_', ' ')}: {best_card['card_name']} (${actual_reward:.2f} rewards)",
+            "total_savings": round(actual_reward, 2)
         }
     
     def _invoke_llm_with_retry(self, input_data: Dict, max_retries: int = 3) -> Dict:

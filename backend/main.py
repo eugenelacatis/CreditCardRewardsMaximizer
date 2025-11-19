@@ -320,6 +320,7 @@ class LocationBasedRecommendationRequest(BaseModel):
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
     radius: Optional[int] = Field(default=2000, ge=100, le=5000)
+    amount: Optional[float] = Field(default=50.0, ge=0.01, description="Transaction amount to calculate rewards for")
 
 
 class PlaceRecommendation(BaseModel):
@@ -1543,26 +1544,33 @@ async def get_location_based_recommendations(
                 timestamp=datetime.utcnow()
             )
 
-        # Get recommendations for each place
+        # Get user's optimization goal (default to balanced if not set)
+        opt_goal = user.default_optimization_goal
+        if opt_goal and hasattr(opt_goal, 'value'):
+            opt_goal_value = opt_goal.value
+        else:
+            opt_goal_value = 'balanced'
+
+        # Use amount from request (default $50)
+        transaction_amount = request.amount
+
+        logger.info(f"User goal: {opt_goal_value}, Cards: {len(user_cards_dict)}, Amount: ${transaction_amount}")
+
+        # Get recommendations for the 5 nearest places
+        # Places are already sorted by distance from location_service
         place_recommendations = []
 
-        for place in nearby_places[:10]:  # Analyze top 10 closest places
+        for place in nearby_places[:5]:  # Take only 5 nearest places
             try:
-                # Prepare transaction data for the agentic system
-                # Get user's optimization goal (default to balanced if not set)
-                opt_goal = user.default_optimization_goal
-                if opt_goal and hasattr(opt_goal, 'value'):
-                    opt_goal_value = opt_goal.value
-                else:
-                    opt_goal_value = 'balanced'
-
                 transaction_data = {
                     'merchant': place['name'],
-                    'amount': 50.0,  # Use average transaction amount
+                    'amount': transaction_amount,
                     'category': place['category'],
                     'optimization_goal': opt_goal_value,
                     'location': place['address']
                 }
+
+                logger.info(f"Getting recommendation for {place['name']} (category: {place['category']})")
 
                 # Use the agentic system to recommend best card for this place
                 recommendation = agentic_system.get_recommendation(
@@ -1575,28 +1583,24 @@ async def get_location_based_recommendations(
                     logger.warning(f"Recommendation error for {place['name']}: {recommendation.get('message')}")
                     continue
 
-                # Calculate reward for this place (expected_value is inside recommended_card)
+                # Get the recommended card details
                 rec_card = recommendation.get('recommended_card', {})
                 expected_reward = rec_card.get('expected_value', 0)
-
-                # Skip if no valid reward
-                if expected_reward <= 0:
-                    continue
 
                 place_recommendations.append({
                     'place': place,
                     'recommendation': recommendation,
-                    'expected_reward': expected_reward,
-                    'score': expected_reward / (place['distance_meters'] / 100)  # Score: reward per 100m
+                    'expected_reward': expected_reward
                 })
+
+                logger.info(f"  -> Best card: {rec_card.get('card_name')} (${expected_reward:.2f})")
 
             except Exception as e:
                 logger.warning(f"Error getting recommendation for {place['name']}: {e}")
                 continue
 
-        # Sort by score (best reward/distance ratio) and take top 5
-        place_recommendations.sort(key=lambda x: x['score'], reverse=True)
-        top_5 = place_recommendations[:5]
+        # Use the recommendations as-is (already in distance order)
+        top_5 = place_recommendations
 
         # Format response
         formatted_recommendations = []
@@ -1628,7 +1632,7 @@ async def get_location_based_recommendations(
                     explanation=rec_card.get('explanation', 'Best rewards for this category')
                 ),
                 expected_reward=item['expected_reward'],
-                reward_explanation=f"Earn ${item['expected_reward']:.2f} in rewards at {place['name']}"
+                reward_explanation=f"Spend ${transaction_amount:.2f} at {place['name']} → Earn ${item['expected_reward']:.2f} in rewards"
             ))
 
         logger.info(f"Returning {len(formatted_recommendations)} location-based recommendations")

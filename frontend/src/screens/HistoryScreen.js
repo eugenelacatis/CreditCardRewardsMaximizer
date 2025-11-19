@@ -71,14 +71,6 @@ export default function HistoryScreen() {
     }, [])
   );
 
-  const totalSaved = transactions
-    .filter((t) => t.optimal)
-    .reduce((sum, t) => sum + (t.cash_back || 0) + (t.points || 0) * 0.01, 0);
-
-  const totalMissed = transactions
-    .filter((t) => !t.optimal)
-    .reduce((sum, t) => sum + (t.missed_value || 0), 0);
-
   const getCategoryEmoji = (category) => {
     const emojis = {
       dining: '🍽️',
@@ -90,6 +82,44 @@ export default function HistoryScreen() {
     };
     return emojis[category] || '💳';
   };
+
+  // Filter transactions based on time filter
+  const filteredTransactions = (() => {
+    if (timeFilter === 'all') {
+      return transactions;
+    }
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    return transactions.filter((transaction) => {
+      const transactionDate = new Date(transaction.date);
+
+      switch (timeFilter) {
+        case 'today':
+          return transactionDate >= today;
+        case 'week':
+          const weekAgo = new Date(today);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          return transactionDate >= weekAgo;
+        case 'month':
+          const monthAgo = new Date(today);
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          return transactionDate >= monthAgo;
+        default:
+          return true;
+      }
+    });
+  })();
+
+  // Calculate stats based on filtered transactions
+  const totalSaved = filteredTransactions
+    .filter((t) => t.optimal)
+    .reduce((sum, t) => sum + (t.cash_back || 0) + (t.points || 0) * 0.01, 0);
+
+  const totalMissed = filteredTransactions
+    .filter((t) => !t.optimal)
+    .reduce((sum, t) => sum + Math.abs(t.missed_value || 0), 0);
 
   const TransactionItem = ({ transaction }) => {
     return (
@@ -131,7 +161,7 @@ export default function HistoryScreen() {
         ) : (
           <View style={styles.suboptimalBadge}>
             <Text style={styles.suboptimalBadgeText}>
-              ⚠️ Could have saved ${transaction.missed_value.toFixed(2)} with {transaction.card_recommended}
+              ⚠️ Could have saved ${Math.abs(transaction.missed_value).toFixed(2)} with {transaction.card_recommended}
             </Text>
           </View>
         )}
@@ -184,7 +214,7 @@ export default function HistoryScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Transaction History</Text>
-        <Text style={styles.subtitle}>{transactions.length} transactions</Text>
+        <Text style={styles.subtitle}>{filteredTransactions.length} transactions</Text>
       </View>
 
       {/* Summary Stats */}
@@ -229,7 +259,7 @@ export default function HistoryScreen() {
       </View>
 
       {/* Transactions List */}
-      {transactions.length === 0 ? (
+      {filteredTransactions.length === 0 ? (
         <EmptyState />
       ) : (
         <ScrollView
@@ -239,17 +269,17 @@ export default function HistoryScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {transactions.map((transaction) => (
+          {filteredTransactions.map((transaction) => (
             <TransactionItem key={transaction.id} transaction={transaction} />
           ))}
 
           {/* Insights */}
-          {transactions.length > 0 && (
+          {filteredTransactions.length > 0 && (
             <View style={styles.insightsSection}>
               <Text style={styles.insightsSectionTitle}>Insights</Text>
               <View style={styles.insightCard}>
                 <Text style={styles.insightText}>
-                  You made {transactions.filter((t) => t.optimal).length} optimal decisions ({transactions.length > 0 ? ((transactions.filter((t) => t.optimal).length / transactions.length) * 100).toFixed(0) : 0}%)
+                  You made {filteredTransactions.filter((t) => t.optimal).length} optimal decisions ({filteredTransactions.length > 0 ? ((filteredTransactions.filter((t) => t.optimal).length / filteredTransactions.length) * 100).toFixed(0) : 0}%)
                 </Text>
                 {totalMissed > 0 && (
                   <Text style={styles.insightText}>
