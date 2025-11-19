@@ -93,7 +93,10 @@ export default function HistoryScreen() {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     return transactions.filter((transaction) => {
-      const transactionDate = new Date(transaction.date);
+      // Parse date string as local time (not UTC)
+      // transaction.date is in format "YYYY-MM-DD"
+      const [year, month, day] = transaction.date.split('-').map(Number);
+      const transactionDate = new Date(year, month - 1, day);
 
       switch (timeFilter) {
         case 'today':
