@@ -1,0 +1,19 @@
+FROM grafana/grafana:10.1.0
+
+# Set environment variables
+ENV GF_SECURITY_ADMIN_USER=admin \
+    GF_SECURITY_ADMIN_PASSWORD=admin \
+    GF_USERS_ALLOW_SIGN_UP=false
+
+# Copy provisioning files and dashboards
+COPY grafana/provisioning /etc/grafana/provisioning
+COPY grafana/dashboards /var/lib/grafana/dashboards
+
+# Expose Grafana port
+EXPOSE 3000
+
+# Grafana runs as user 472 by default
+USER grafana
+
+# Start Grafana
+CMD ["/run.sh"]

@@ -36,6 +36,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      loki:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -45,6 +47,12 @@ services:
       start_period: 5s
     networks:
       - app-network
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        labels: "service=backend,environment=development"
     command: ["/bin/sh","-c","set -e; if [ -f /app/startup.sh ]; then sed -i 's/\\r$//' /app/startup.sh; chmod +x /app/startup.sh; exec /app/startup.sh; else echo 'startup.sh not found at /app'; exit 1; fi"]
 
 
@@ -70,9 +78,82 @@ services:
     networks:
       - app-network
 
+  # =============================================================================
+  # OBSERVABILITY STACK
+  # =============================================================================
+
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: credit-card-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: credit-card-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: credit-card-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    user: "0"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: credit-card-promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    restart: unless-stopped
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
