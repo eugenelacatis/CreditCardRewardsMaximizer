@@ -1,4 +1,4 @@
-// src/screens/CardsScreen.js - Updated for UserCreditCard/Wallet system
+// src/screens/CardsScreen.js - Modern UI with theme system
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -14,8 +14,12 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '../services/api';
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';
+import { Card, GradientButton, Button, Badge, EmptyState } from '../components/ui';
 
 export default function CardsScreen() {
   const [userId, setUserId] = useState(null);
@@ -29,7 +33,6 @@ export default function CardsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIssuer, setSelectedIssuer] = useState('All');
 
-  // Load user ID on mount
   useEffect(() => {
     const loadUserId = async () => {
       const id = await AsyncStorage.getItem('userId');
@@ -38,7 +41,6 @@ export default function CardsScreen() {
     loadUserId();
   }, []);
 
-  // Convert API response to UI format
   const walletCardToUi = useCallback((c) => {
     return {
       id: c?.user_card_id ?? String(Math.random()),
@@ -78,7 +80,6 @@ export default function CardsScreen() {
     };
   }, []);
 
-  // Fetch wallet cards
   const fetchWalletCards = useCallback(async () => {
     if (!userId) {
       setLoading(false);
@@ -97,7 +98,7 @@ export default function CardsScreen() {
       setWalletCards([]);
 
       if (err.response?.status === 404) {
-        setErrorMsg(null); // No error for empty state
+        setErrorMsg(null);
       } else {
         setErrorMsg('Could not load wallet. Pull down to retry.');
       }
@@ -106,7 +107,6 @@ export default function CardsScreen() {
     }
   }, [userId, walletCardToUi]);
 
-  // Fetch library cards
   const fetchLibraryCards = useCallback(async () => {
     try {
       const response = await API.getCardLibrary({ limit: 100 });
@@ -131,7 +131,6 @@ export default function CardsScreen() {
     fetchWalletCards();
   }, [fetchWalletCards]);
 
-  // Add card from library to wallet
   const handleAddCardToWallet = useCallback(async (libraryCard) => {
     if (!userId) {
       Alert.alert('Error', 'User not logged in');
@@ -171,8 +170,6 @@ export default function CardsScreen() {
     );
   }, [userId, fetchWalletCards]);
 
-
-  // Delete wallet card
   const handleDeleteCard = useCallback((card) => {
     Alert.alert(
       'Remove Card',
@@ -184,7 +181,7 @@ export default function CardsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await API.deleteWalletCard(card.userCardId, true); // Hard delete
+              await API.deleteWalletCard(card.userCardId, true);
               await fetchWalletCards();
               Alert.alert('Removed', 'Card removed from wallet');
             } catch (error) {
@@ -197,7 +194,6 @@ export default function CardsScreen() {
     );
   }, [fetchWalletCards]);
 
-  // Filter library cards
   const filteredLibraryCards = useMemo(() => {
     let filtered = libraryCards;
 
@@ -216,73 +212,104 @@ export default function CardsScreen() {
     return filtered;
   }, [libraryCards, selectedIssuer, searchQuery]);
 
-  // Get unique issuers from library
   const issuers = useMemo(() => {
     const unique = new Set(libraryCards.map(c => c.issuer));
     return ['All', ...Array.from(unique).sort()];
   }, [libraryCards]);
 
-  // Wallet Card Item
+  const getCardGradient = (issuer) => {
+    const gradients = {
+      'Chase': ['#1A73E8', '#0D47A1'],
+      'American Express': ['#006FCF', '#003087'],
+      'Capital One': ['#D03027', '#8B0000'],
+      'Discover': ['#FF6600', '#CC5200'],
+      'Citi': ['#003B70', '#001F3F'],
+      'Bank of America': ['#E31837', '#B71C1C'],
+      'Wells Fargo': ['#D71E28', '#8B0000'],
+    };
+    return gradients[issuer] || colors.gradients.primary;
+  };
+
   const WalletCardItem = ({ card }) => (
     <TouchableOpacity
-      style={styles.cardItem}
+      style={styles.walletCard}
       onLongPress={() => handleDeleteCard(card)}
+      activeOpacity={0.9}
     >
-      <View style={styles.cardIcon}>
-        <Text style={styles.cardIconText}>💳</Text>
-      </View>
-      <View style={styles.cardDetails}>
-        <Text style={styles.cardName}>{card.name}</Text>
-        <Text style={styles.cardIssuer}>{card.issuer}</Text>
-        {card.creditLimit && (
-          <Text style={styles.cardLimit}>Limit: ${card.creditLimit.toLocaleString()}</Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-
-  // Library Card Item
-  const LibraryCardItem = ({ card }) => (
-    <TouchableOpacity
-      style={styles.libraryCardItem}
-      onPress={() => handleAddCardToWallet(card)}
-    >
-      <View style={styles.cardDetails}>
-        <Text style={styles.libraryCardName}>{card.name}</Text>
-        <Text style={styles.libraryCardIssuer}>{card.issuer}</Text>
-        <Text style={styles.libraryCardFee}>
-          Annual Fee: ${card.annualFee}
-        </Text>
-        <Text style={styles.libraryCardBenefits} numberOfLines={2}>
-          {card.benefitsPreview}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.addToWalletButton}
-        onPress={() => handleAddCardToWallet(card)}
+      <LinearGradient
+        colors={getCardGradient(card.issuer)}
+        style={styles.walletCardGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
-        <Text style={styles.addToWalletText}>+ Add</Text>
-      </TouchableOpacity>
+        <View style={styles.walletCardHeader}>
+          <Text style={styles.walletCardIssuer}>{card.issuer}</Text>
+          <Icon name="contactless-payment" size={24} color="rgba(255,255,255,0.8)" />
+        </View>
+
+        <View style={styles.walletCardChip}>
+          <View style={styles.chipIcon} />
+        </View>
+
+        <Text style={styles.walletCardName}>{card.name}</Text>
+
+        {card.creditLimit && (
+          <View style={styles.walletCardFooter}>
+            <Text style={styles.walletCardLimit}>
+              Limit: ${card.creditLimit.toLocaleString()}
+            </Text>
+          </View>
+        )}
+      </LinearGradient>
     </TouchableOpacity>
   );
 
-  // Empty State
-  const EmptyState = () => (
+  const LibraryCardItem = ({ card }) => (
+    <Card style={styles.libraryCardItem}>
+      <View style={styles.libraryCardContent}>
+        <View style={styles.libraryCardInfo}>
+          <Text style={styles.libraryCardName}>{card.name}</Text>
+          <Text style={styles.libraryCardIssuer}>{card.issuer}</Text>
+          <View style={styles.libraryCardMeta}>
+            <Badge
+              text={card.annualFee === 0 ? 'No Annual Fee' : `$${card.annualFee}/yr`}
+              variant={card.annualFee === 0 ? 'success' : 'warning'}
+              size="small"
+            />
+          </View>
+          <Text style={styles.libraryCardBenefits} numberOfLines={2}>
+            {card.benefitsPreview}
+          </Text>
+        </View>
+        <Button
+          title="Add"
+          icon="plus"
+          variant="primary"
+          size="small"
+          onPress={() => handleAddCardToWallet(card)}
+        />
+      </View>
+    </Card>
+  );
+
+  const EmptyWalletState = () => (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyEmoji}>🃏</Text>
+      <View style={styles.emptyIconContainer}>
+        <Icon name="credit-card-off-outline" size={64} color={colors.neutral[300]} />
+      </View>
       <Text style={styles.emptyTitle}>No Cards in Wallet</Text>
       <Text style={styles.emptyText}>
-        Browse the card library and add cards to your wallet
+        Browse the card library and add cards to your wallet to start getting AI-powered recommendations
       </Text>
-      <TouchableOpacity
-        style={styles.emptyButton}
+      <GradientButton
+        title="Browse Card Library"
+        icon="credit-card-search"
         onPress={() => {
           fetchLibraryCards();
           setShowLibraryModal(true);
         }}
-      >
-        <Text style={styles.emptyButtonText}>📚 Browse Card Library</Text>
-      </TouchableOpacity>
+        style={styles.emptyButton}
+      />
     </View>
   );
 
@@ -294,45 +321,59 @@ export default function CardsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>My Wallet</Text>
-          <Text style={styles.subtitle}>{cardCountText}</Text>
+      <LinearGradient
+        colors={colors.gradients.primary}
+        style={styles.header}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.title}>My Wallet</Text>
+            <Text style={styles.subtitle}>{cardCountText}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.browseButton}
+            onPress={() => {
+              fetchLibraryCards();
+              setShowLibraryModal(true);
+            }}
+          >
+            <Icon name="plus" size={20} color={colors.primary.main} />
+            <Text style={styles.browseButtonText}>Add</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => {
-            fetchLibraryCards();
-            setShowLibraryModal(true);
-          }}
-        >
-          <Text style={styles.addButtonText}>📚 Browse</Text>
-        </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {/* Error banner */}
       {!!errorMsg && (
         <View style={styles.errorBox}>
+          <Icon name="alert-circle" size={20} color={colors.error.main} />
           <Text style={styles.errorText}>{errorMsg}</Text>
         </View>
       )}
 
       {/* Loading / List */}
       {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator />
-          <Text style={{ marginTop: 8, color: '#666' }}>Loading wallet...</Text>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary.main} />
+          <Text style={styles.loadingText}>Loading wallet...</Text>
         </View>
       ) : walletCards.length === 0 ? (
-        <EmptyState />
+        <EmptyWalletState />
       ) : (
         <FlatList
           data={walletCards}
           renderItem={({ item }) => <WalletCardItem card={item} />}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary.main}
+            />
           }
         />
       )}
@@ -347,25 +388,42 @@ export default function CardsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Card Library ({filteredLibraryCards.length})</Text>
+              <View>
+                <Text style={styles.modalTitle}>Card Library</Text>
+                <Text style={styles.modalSubtitle}>{filteredLibraryCards.length} cards available</Text>
+              </View>
               <TouchableOpacity
                 onPress={() => setShowLibraryModal(false)}
                 style={styles.closeButton}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Icon name="close" size={24} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
 
             {/* Search */}
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search cards..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+            <View style={styles.searchContainer}>
+              <Icon name="magnify" size={20} color={colors.neutral[400]} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search cards..."
+                placeholderTextColor={colors.neutral[400]}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Icon name="close-circle" size={20} color={colors.neutral[400]} />
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* Issuer Filter */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterRow}
+              contentContainerStyle={styles.filterContent}
+            >
               {issuers.map((issuer) => (
                 <TouchableOpacity
                   key={issuer}
@@ -393,17 +451,16 @@ export default function CardsScreen() {
               renderItem={({ item }) => <LibraryCardItem card={item} />}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.libraryList}
+              showsVerticalScrollIndicator={false}
             />
           </View>
         </View>
       </Modal>
 
-
       {!loading && walletCards.length > 0 && (
         <View style={styles.helpBox}>
-          <Text style={styles.helpText}>
-            💡 Long press to remove card
-          </Text>
+          <Icon name="gesture-tap-hold" size={18} color={colors.primary.main} />
+          <Text style={styles.helpText}>Long press on a card to remove it</Text>
         </View>
       )}
     </SafeAreaView>
@@ -411,186 +468,288 @@ export default function CardsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+
+  // Header
   header: {
-    backgroundColor: '#4A90E2',
-    padding: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    paddingTop: spacing.xl,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
-  subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  addButton: { backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20 },
-  addButtonText: { color: '#4A90E2', fontSize: 14, fontWeight: 'bold' },
-  list: { padding: 20 },
-  cardItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+  title: {
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
+  },
+  subtitle: {
+    fontSize: typography.fontSize.sm,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: spacing.xs,
+  },
+  browseButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: colors.background.secondary,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    ...shadows.md,
   },
-  cardIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+  browseButtonText: {
+    color: colors.primary.main,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    marginLeft: spacing.xs,
   },
-  cardIconText: { fontSize: 24 },
-  cardDetails: { flex: 1 },
-  cardName: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 4 },
-  lastFour: { fontSize: 14, fontWeight: 'normal', color: '#666' },
-  cardIssuer: { fontSize: 13, color: '#666', marginBottom: 4 },
-  cardLimit: { fontSize: 12, color: '#4A90E2', fontWeight: '500' },
 
-  // Library card
+  // List
+  list: {
+    padding: spacing.lg,
+  },
+
+  // Wallet Card
+  walletCard: {
+    marginBottom: spacing.base,
+    borderRadius: borderRadius.xl,
+    ...shadows.lg,
+  },
+  walletCardGradient: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    minHeight: 180,
+  },
+  walletCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  walletCardIssuer: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  walletCardChip: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.base,
+  },
+  chipIcon: {
+    width: 40,
+    height: 28,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: borderRadius.sm,
+  },
+  walletCardName: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.inverse,
+    marginTop: spacing.sm,
+  },
+  walletCardFooter: {
+    marginTop: 'auto',
+    paddingTop: spacing.sm,
+  },
+  walletCardLimit: {
+    fontSize: typography.fontSize.sm,
+    color: 'rgba(255,255,255,0.8)',
+  },
+
+  // Library Card
   libraryCardItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: spacing.sm,
+  },
+  libraryCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  libraryCardName: { fontSize: 15, fontWeight: 'bold', color: '#333', marginBottom: 4 },
-  libraryCardIssuer: { fontSize: 13, color: '#666', marginBottom: 4 },
-  libraryCardFee: { fontSize: 12, color: '#FF6B6B', marginBottom: 4 },
-  libraryCardBenefits: { fontSize: 11, color: '#4A90E2', marginTop: 4 },
-  addToWalletButton: {
-    backgroundColor: '#4A90E2',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginLeft: 12,
+  libraryCardInfo: {
+    flex: 1,
   },
-  addToWalletText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  libraryCardName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  libraryCardIssuer: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+  },
+  libraryCardMeta: {
+    marginBottom: spacing.sm,
+  },
+  libraryCardBenefits: {
+    fontSize: typography.fontSize.xs,
+    color: colors.primary.main,
+  },
 
-  // Empty/Error
-  errorBox: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 8,
-    padding: 12,
-  },
-  errorText: { color: '#C62828', fontSize: 14 },
-
+  // Empty State
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing['3xl'],
   },
-  emptyEmoji: { fontSize: 64, marginBottom: 16 },
-  emptyTitle: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 8 },
+  emptyIconContainer: {
+    marginBottom: spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
   emptyText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: typography.fontSize.base,
+    color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 24,
     lineHeight: 22,
+    marginBottom: spacing.xl,
   },
   emptyButton: {
-    backgroundColor: '#4A90E2',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: spacing.xl,
   },
-  emptyButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+
+  // Error & Loading
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    backgroundColor: colors.error[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+  },
+  errorText: {
+    color: colors.error[700],
+    fontSize: typography.fontSize.sm,
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: spacing.sm,
+    fontSize: typography.fontSize.base,
+    color: colors.text.secondary,
+  },
 
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.background.modal,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    backgroundColor: colors.background.card,
+    borderTopLeftRadius: borderRadius['2xl'],
+    borderTopRightRadius: borderRadius['2xl'],
+    padding: spacing.lg,
     maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
   },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#333' },
+  modalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  modalSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+  },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.neutral[100],
     justifyContent: 'center',
     alignItems: 'center',
   },
-  closeButtonText: { fontSize: 20, color: '#666' },
 
-  // Search & Filter
-  searchInput: {
-    backgroundColor: '#F5F7FA',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  filterRow: {
+  // Search
+  searchContainer: {
     flexDirection: 'row',
-    marginBottom: 16,
+    alignItems: 'center',
+    backgroundColor: colors.background.tertiary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+  },
+
+  // Filter
+  filterRow: {
+    marginBottom: spacing.md,
+  },
+  filterContent: {
+    paddingRight: spacing.lg,
   },
   filterButton: {
-    backgroundColor: '#F5F7FA',
+    backgroundColor: colors.background.tertiary,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    marginRight: spacing.sm,
   },
   filterButtonActive: {
-    backgroundColor: '#4A90E2',
-    borderColor: '#4A90E2',
+    backgroundColor: colors.primary.main,
+    borderColor: colors.primary.main,
   },
   filterButtonText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
   },
   filterButtonTextActive: {
-    color: '#fff',
+    color: colors.text.inverse,
   },
   libraryList: {
-    paddingBottom: 20,
+    paddingBottom: spacing.xl,
   },
 
+  // Help Box
   helpBox: {
-    padding: 16,
-    backgroundColor: '#E3F2FD',
-    margin: 20,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.base,
+    backgroundColor: colors.primary[50],
+    margin: spacing.lg,
+    marginTop: 0,
+    borderRadius: borderRadius.lg,
   },
   helpText: {
-    fontSize: 14,
-    color: '#1976D2',
-    textAlign: 'center',
+    fontSize: typography.fontSize.sm,
+    color: colors.primary.main,
+    marginLeft: spacing.sm,
   },
 });

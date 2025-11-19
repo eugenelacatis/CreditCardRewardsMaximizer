@@ -207,6 +207,24 @@ export const API = {
     return await apiClient.get(`/users/${userId}/profile`);
   },
 
+  updateUserProfile: async (userId, profileData) => {
+    console.log('');
+    console.log('===============================');
+    console.log('API.updateUserProfile called');
+    console.log('===============================');
+    console.log('User ID:', userId);
+    console.log('Profile Data:', JSON.stringify(profileData, null, 2));
+
+    try {
+      const response = await apiClient.put(`/users/${userId}/profile`, profileData);
+      console.log('Profile updated:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error updating profile:', error.message);
+      throw error;
+    }
+  },
+
   // Location-based methods
   getNearbyPlaces: async (latitude, longitude, radius = 2000) => {
     console.log('');

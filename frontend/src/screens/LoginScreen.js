@@ -3,20 +3,21 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
   ActivityIndicator,
-  ScrollView
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';
+import { Input, Button, GradientButton, Chip } from '../components/ui';
 
-// The 'onLogin' and 'onBack' props are passed down from App.js
 export default function LoginScreen({ onLogin, onBack }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,6 +25,7 @@ export default function LoginScreen({ onLogin, onBack }) {
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [optimizationGoal, setOptimizationGoal] = useState('balanced');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLoginPress = async () => {
     if (!email || !password) {
@@ -38,14 +40,11 @@ export default function LoginScreen({ onLogin, onBack }) {
         password: password
       });
 
-      // Store user data
       await AsyncStorage.setItem('userId', response.data.user_id);
       await AsyncStorage.setItem('userEmail', response.data.email);
       await AsyncStorage.setItem('userFullName', response.data.full_name);
 
-      console.log('✅ Login successful, user ID:', response.data.user_id);
-
-      // Call onLogin with user data
+      console.log('Login successful, user ID:', response.data.user_id);
       onLogin(response.data.user_id);
 
     } catch (error) {
@@ -79,19 +78,18 @@ export default function LoginScreen({ onLogin, onBack }) {
         optimization_goal: optimizationGoal
       });
 
-      // Store user data
       await AsyncStorage.setItem('userId', response.data.user_id);
       await AsyncStorage.setItem('userEmail', response.data.email);
       await AsyncStorage.setItem('userFullName', response.data.full_name);
 
-      console.log('✅ Signup successful, user ID:', response.data.user_id);
+      console.log('Signup successful, user ID:', response.data.user_id);
 
       Alert.alert(
-        'Success',
-        'Account created successfully!',
+        'Welcome!',
+        'Your account has been created successfully.',
         [
           {
-            text: 'OK',
+            text: 'Get Started',
             onPress: () => onLogin(response.data.user_id)
           }
         ]
@@ -115,10 +113,10 @@ export default function LoginScreen({ onLogin, onBack }) {
   };
 
   const optimizationGoals = [
-    { value: 'cash_back', label: 'Cash Back', icon: 'cash-multiple', description: 'Maximize cash back rewards' },
-    { value: 'travel_points', label: 'Travel Points', icon: 'airplane', description: 'Maximize travel points & miles' },
-    { value: 'specific_discounts', label: 'Specific Discounts', icon: 'sale', description: 'Focus on category discounts' },
-    { value: 'balanced', label: 'Balanced', icon: 'scale-balance', description: 'Best overall value' },
+    { value: 'cash_back', label: 'Cash Back', icon: 'cash-multiple' },
+    { value: 'travel_points', label: 'Travel', icon: 'airplane' },
+    { value: 'specific_discounts', label: 'Discounts', icon: 'sale' },
+    { value: 'balanced', label: 'Balanced', icon: 'scale-balance' },
   ];
 
   return (
@@ -134,245 +132,318 @@ export default function LoginScreen({ onLogin, onBack }) {
         >
           {onBack && (
             <TouchableOpacity style={styles.backButton} onPress={onBack} disabled={loading}>
-              <Icon name="arrow-left" size={24} color="#4A90E2" />
-              <Text style={styles.backButtonText}>Back</Text>
+              <Icon name="arrow-left" size={24} color={colors.primary.main} />
             </TouchableOpacity>
           )}
+
+          {/* Logo & Header */}
           <View style={styles.header}>
-            <Icon name="wallet" size={60} color="#4A90E2" />
+            <LinearGradient
+              colors={colors.gradients.primary}
+              style={styles.logoContainer}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Icon name="wallet" size={40} color={colors.text.inverse} />
+            </LinearGradient>
             <Text style={styles.title}>Agentic Wallet</Text>
             <Text style={styles.subtitle}>
-              {isSignupMode ? 'Create your account' : 'Sign in to continue'}
+              {isSignupMode ? 'Create your account' : 'Welcome back'}
             </Text>
           </View>
 
-        <View style={styles.form}>
-          {isSignupMode && (
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              placeholderTextColor="#888"
-              value={fullName}
-              onChangeText={setFullName}
-              autoCapitalize="words"
+          {/* Form Card */}
+          <View style={styles.formCard}>
+            {isSignupMode && (
+              <Input
+                label="Full Name"
+                placeholder="Enter your full name"
+                value={fullName}
+                onChangeText={setFullName}
+                icon="account-outline"
+                autoCapitalize="words"
+                editable={!loading}
+              />
+            )}
+
+            <Input
+              label="Email"
+              placeholder="Enter your email"
+              value={email}
+              onChangeText={setEmail}
+              icon="email-outline"
+              keyboardType="email-address"
+              autoCapitalize="none"
               editable={!loading}
             />
-          )}
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#888"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!loading}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#888"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!loading}
-          />
 
-          {isSignupMode && (
-            <View style={styles.goalSection}>
-              <Text style={styles.goalLabel}>Optimization Goal</Text>
-              <View style={styles.goalOptions}>
-                {optimizationGoals.map((goal) => (
-                  <TouchableOpacity
-                    key={goal.value}
-                    style={[
-                      styles.goalOption,
-                      optimizationGoal === goal.value && styles.goalOptionSelected
-                    ]}
-                    onPress={() => setOptimizationGoal(goal.value)}
-                    disabled={loading}
-                  >
-                    <Icon
-                      name={goal.icon}
-                      size={16}
-                      color={optimizationGoal === goal.value ? '#4A90E2' : '#666'}
-                    />
-                    <Text style={[
-                      styles.goalOptionText,
-                      optimizationGoal === goal.value && styles.goalOptionTextSelected
-                    ]}>
-                      {goal.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <Input
+              label="Password"
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={setPassword}
+              icon="lock-outline"
+              secureTextEntry={!showPassword}
+              rightIcon={showPassword ? 'eye-off-outline' : 'eye-outline'}
+              onRightIconPress={() => setShowPassword(!showPassword)}
+              editable={!loading}
+            />
+
+            {isSignupMode && (
+              <View style={styles.goalSection}>
+                <Text style={styles.goalLabel}>Optimization Goal</Text>
+                <View style={styles.goalOptions}>
+                  {optimizationGoals.map((goal) => (
+                    <TouchableOpacity
+                      key={goal.value}
+                      style={[
+                        styles.goalOption,
+                        optimizationGoal === goal.value && styles.goalOptionSelected
+                      ]}
+                      onPress={() => setOptimizationGoal(goal.value)}
+                      disabled={loading}
+                    >
+                      <Icon
+                        name={goal.icon}
+                        size={20}
+                        color={optimizationGoal === goal.value ? colors.primary.main : colors.neutral[400]}
+                      />
+                      <Text style={[
+                        styles.goalOptionText,
+                        optimizationGoal === goal.value && styles.goalOptionTextSelected
+                      ]}>
+                        {goal.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled, isSignupMode && styles.buttonSignup]}
-            onPress={isSignupMode ? handleSignupPress : handleLoginPress}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>
-                {isSignupMode ? 'Sign Up' : 'Login'}
-              </Text>
             )}
-          </TouchableOpacity>
-        </View>
 
+            <GradientButton
+              title={isSignupMode ? 'Create Account' : 'Sign In'}
+              onPress={isSignupMode ? handleSignupPress : handleLoginPress}
+              loading={loading}
+              disabled={loading}
+              icon={isSignupMode ? 'account-plus' : 'login'}
+              iconPosition="left"
+              style={styles.submitButton}
+            />
+
+            {!isSignupMode && (
+              <TouchableOpacity style={styles.forgotPassword} disabled={loading}>
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
               {isSignupMode ? 'Already have an account?' : "Don't have an account?"}
             </Text>
             <TouchableOpacity onPress={toggleMode} disabled={loading}>
-              <Text style={styles.signupText}>
+              <Text style={styles.switchModeText}>
                 {isSignupMode ? 'Sign In' : 'Sign Up'}
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Social Login Divider - For future use */}
+          {!isSignupMode && (
+            <View style={styles.socialSection}>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or continue with</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <View style={styles.socialButtons}>
+                <TouchableOpacity style={styles.socialButton} disabled>
+                  <Icon name="google" size={24} color={colors.neutral[400]} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.socialButton} disabled>
+                  <Icon name="apple" size={24} color={colors.neutral[400]} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.comingSoonText}>Coming Soon</Text>
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-// Re-using and adapting styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: colors.background.primary,
   },
   content: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 30,
-    paddingVertical: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.background.secondary,
+    justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginBottom: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    marginBottom: spacing.lg,
+    ...shadows.sm,
   },
-  backButtonText: {
-    fontSize: 16,
-    color: '#4A90E2',
-    marginLeft: 4,
-    fontWeight: '500',
-  },
+
+  // Header
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: spacing['2xl'],
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: borderRadius['2xl'],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.base,
+    ...shadows.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
+    fontSize: typography.fontSize['3xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginTop: spacing.sm,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 8,
+    fontSize: typography.fontSize.md,
+    color: colors.text.secondary,
+    marginTop: spacing.sm,
   },
-  form: {
-    width: '100%',
+
+  // Form Card
+  formCard: {
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius['2xl'],
+    padding: spacing.lg,
+    ...shadows.md,
   },
-  input: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 12,
-    fontSize: 16,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    color: '#333',
+  submitButton: {
+    marginTop: spacing.sm,
   },
-  button: {
-    backgroundColor: '#4A90E2',
-    padding: 18,
-    borderRadius: 12,
+  forgotPassword: {
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: spacing.base,
   },
-  buttonSignup: {
-    marginTop: 5,
+  forgotPasswordText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary.main,
+    fontWeight: typography.fontWeight.medium,
   },
-  buttonDisabled: {
-    backgroundColor: '#A0A0A0',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 30,
-  },
-  footerText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  signupText: {
-    fontSize: 16,
-    color: '#4A90E2',
-    fontWeight: 'bold',
-    marginLeft: 5,
-  },
+
+  // Goal Section
   goalSection: {
-    marginBottom: 8,
+    marginBottom: spacing.base,
   },
   goalLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   goalOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 5,
-    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   goalOption: {
     flex: 1,
-    minWidth: '47%',
-    maxWidth: '48%',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    minWidth: '45%',
+    backgroundColor: colors.background.tertiary,
+    borderWidth: 1.5,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
   },
   goalOptionSelected: {
-    borderColor: '#4A90E2',
-    backgroundColor: '#F0F7FF',
+    borderColor: colors.primary.main,
+    backgroundColor: colors.primary[50],
   },
   goalOptionText: {
-    fontSize: 9,
-    color: '#666',
-    marginTop: 2,
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: typography.fontWeight.medium,
   },
   goalOptionTextSelected: {
-    color: '#4A90E2',
-    fontWeight: '700',
+    color: colors.primary.main,
+    fontWeight: typography.fontWeight.bold,
+  },
+
+  // Footer
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
+  footerText: {
+    fontSize: typography.fontSize.base,
+    color: colors.text.secondary,
+  },
+  switchModeText: {
+    fontSize: typography.fontSize.base,
+    color: colors.primary.main,
+    fontWeight: typography.fontWeight.bold,
+    marginLeft: spacing.xs,
+  },
+
+  // Social Login
+  socialSection: {
+    marginTop: spacing.xl,
+    alignItems: 'center',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: spacing.base,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border.light,
+  },
+  dividerText: {
+    marginHorizontal: spacing.md,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+  },
+  socialButtons: {
+    flexDirection: 'row',
+    gap: spacing.base,
+  },
+  socialButton: {
+    width: 56,
+    height: 56,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  comingSoonText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.sm,
   },
 });

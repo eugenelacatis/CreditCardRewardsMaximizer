@@ -1,4 +1,4 @@
-// src/screens/HistoryScreen.js - Complete with Real API Data
+// src/screens/HistoryScreen.js - Modern UI with theme system
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -10,9 +10,13 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '../services/api';
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';
+import { Card, Badge, Button, StatCard } from '../components/ui';
 
 export default function HistoryScreen() {
   const [timeFilter, setTimeFilter] = useState('all');
@@ -34,7 +38,6 @@ export default function HistoryScreen() {
 
       const response = await API.getTransactionHistory(userId, 50);
 
-      // Transform API response to match expected format
       const formattedTransactions = response.data.transactions.map(t => ({
         id: t.transaction_id,
         merchant: t.merchant,
@@ -64,26 +67,36 @@ export default function HistoryScreen() {
     setRefreshing(false);
   };
 
-  // Refresh transactions when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       fetchTransactions();
     }, [])
   );
 
-  const getCategoryEmoji = (category) => {
-    const emojis = {
-      dining: '🍽️',
-      gas: '⛽',
-      groceries: '🛒',
-      shopping: '🛍️',
-      entertainment: '🎬',
-      travel: '✈️',
+  const getCategoryIcon = (category) => {
+    const icons = {
+      dining: 'silverware-fork-knife',
+      gas: 'gas-station',
+      groceries: 'cart',
+      shopping: 'shopping',
+      entertainment: 'movie',
+      travel: 'airplane',
     };
-    return emojis[category] || '💳';
+    return icons[category] || 'credit-card';
   };
 
-  // Filter transactions based on time filter
+  const getCategoryColor = (category) => {
+    const categoryColors = {
+      dining: colors.error.main,
+      gas: colors.warning.main,
+      groceries: colors.success.main,
+      shopping: colors.secondary.main,
+      entertainment: '#E91E63',
+      travel: colors.primary.main,
+    };
+    return categoryColors[category] || colors.neutral[500];
+  };
+
   const filteredTransactions = (() => {
     if (timeFilter === 'all') {
       return transactions;
@@ -112,7 +125,6 @@ export default function HistoryScreen() {
     });
   })();
 
-  // Calculate stats based on filtered transactions
   const totalSaved = filteredTransactions
     .filter((t) => t.optimal)
     .reduce((sum, t) => sum + (t.cash_back || 0) + (t.points || 0) * 0.01, 0);
@@ -123,19 +135,23 @@ export default function HistoryScreen() {
 
   const TransactionItem = ({ transaction }) => {
     return (
-      <View
+      <Card
         style={[
           styles.transactionItem,
           !transaction.optimal && styles.transactionItemSuboptimal,
         ]}
       >
-        {/* Transaction Header */}
         <View style={styles.transactionHeader}>
           <View style={styles.merchantRow}>
-            <View style={styles.emojiCircle}>
-              <Text style={styles.categoryEmoji}>
-                {getCategoryEmoji(transaction.category)}
-              </Text>
+            <View style={[
+              styles.categoryIconContainer,
+              { backgroundColor: getCategoryColor(transaction.category) + '20' }
+            ]}>
+              <Icon
+                name={getCategoryIcon(transaction.category)}
+                size={20}
+                color={getCategoryColor(transaction.category)}
+              />
             </View>
             <View style={styles.merchantInfo}>
               <Text style={styles.merchantName}>{transaction.merchant}</Text>
@@ -145,33 +161,35 @@ export default function HistoryScreen() {
           <Text style={styles.transactionAmount}>${transaction.amount.toFixed(2)}</Text>
         </View>
 
-        {/* Card Used */}
         <View style={styles.cardUsedRow}>
-          <Text style={styles.cardUsedLabel}>Card Used:</Text>
+          <Icon name="credit-card-outline" size={14} color={colors.neutral[400]} />
           <Text style={styles.cardUsedName}>{transaction.card_used}</Text>
         </View>
 
-        {/* Optimal/Suboptimal Badge */}
         {transaction.optimal ? (
           <View style={styles.optimalBadge}>
+            <Icon name="check-circle" size={14} color={colors.success[700]} />
             <Text style={styles.optimalBadgeText}>
-              ✓ Optimal Choice • Earned ${(transaction.cash_back + transaction.points * 0.01).toFixed(2)}
+              Optimal Choice - Earned ${(transaction.cash_back + transaction.points * 0.01).toFixed(2)}
             </Text>
           </View>
         ) : (
           <View style={styles.suboptimalBadge}>
+            <Icon name="alert-circle-outline" size={14} color={colors.warning[700]} />
             <Text style={styles.suboptimalBadgeText}>
-              ⚠️ Could have saved ${Math.abs(transaction.missed_value).toFixed(2)} with {transaction.card_recommended}
+              Could have saved ${Math.abs(transaction.missed_value).toFixed(2)} with {transaction.card_recommended}
             </Text>
           </View>
         )}
-      </View>
+      </Card>
     );
   };
 
   const EmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyEmoji}>📊</Text>
+      <View style={styles.emptyIconContainer}>
+        <Icon name="chart-bar" size={64} color={colors.neutral[300]} />
+      </View>
       <Text style={styles.emptyTitle}>No Transactions Yet</Text>
       <Text style={styles.emptyText}>
         Start using the app to track your transactions and see your history here
@@ -182,11 +200,14 @@ export default function HistoryScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+        <LinearGradient
+          colors={colors.gradients.primary}
+          style={styles.header}
+        >
           <Text style={styles.title}>Transaction History</Text>
-        </View>
+        </LinearGradient>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
+          <ActivityIndicator size="large" color={colors.primary.main} />
           <Text style={styles.loadingText}>Loading transactions...</Text>
         </View>
       </SafeAreaView>
@@ -196,14 +217,21 @@ export default function HistoryScreen() {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+        <LinearGradient
+          colors={colors.gradients.primary}
+          style={styles.header}
+        >
           <Text style={styles.title}>Transaction History</Text>
-        </View>
+        </LinearGradient>
         <View style={styles.errorContainer}>
+          <Icon name="alert-circle-outline" size={48} color={colors.error.main} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchTransactions}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+          <Button
+            title="Retry"
+            variant="primary"
+            onPress={fetchTransactions}
+            style={styles.retryButton}
+          />
         </View>
       </SafeAreaView>
     );
@@ -212,22 +240,29 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={colors.gradients.primary}
+        style={styles.header}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
         <Text style={styles.title}>Transaction History</Text>
         <Text style={styles.subtitle}>{filteredTransactions.length} transactions</Text>
-      </View>
+      </LinearGradient>
 
       {/* Summary Stats */}
       <View style={styles.summarySection}>
         <View style={styles.statCard}>
+          <Icon name="check-circle" size={24} color={colors.success.main} />
           <Text style={styles.statLabel}>Total Saved</Text>
-          <Text style={[styles.statValue, { color: '#4CAF50' }]}>
+          <Text style={[styles.statValue, { color: colors.success.main }]}>
             ${totalSaved.toFixed(2)}
           </Text>
         </View>
         <View style={styles.statCard}>
+          <Icon name="alert-circle-outline" size={24} color={colors.error.main} />
           <Text style={styles.statLabel}>Missed Value</Text>
-          <Text style={[styles.statValue, { color: '#FF5252' }]}>
+          <Text style={[styles.statValue, { color: colors.error.main }]}>
             ${totalMissed.toFixed(2)}
           </Text>
         </View>
@@ -266,7 +301,11 @@ export default function HistoryScreen() {
           style={styles.transactionsList}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary.main}
+            />
           }
         >
           {filteredTransactions.map((transaction) => (
@@ -275,20 +314,23 @@ export default function HistoryScreen() {
 
           {/* Insights */}
           {filteredTransactions.length > 0 && (
-            <View style={styles.insightsSection}>
-              <Text style={styles.insightsSectionTitle}>Insights</Text>
-              <View style={styles.insightCard}>
-                <Text style={styles.insightText}>
-                  You made {filteredTransactions.filter((t) => t.optimal).length} optimal decisions ({filteredTransactions.length > 0 ? ((filteredTransactions.filter((t) => t.optimal).length / filteredTransactions.length) * 100).toFixed(0) : 0}%)
-                </Text>
-                {totalMissed > 0 && (
-                  <Text style={styles.insightText}>
-                    You could save an extra ${totalMissed.toFixed(2)} by following all recommendations
-                  </Text>
-                )}
+            <Card elevated style={styles.insightsCard}>
+              <View style={styles.insightsHeader}>
+                <Icon name="lightbulb-outline" size={20} color={colors.warning.main} />
+                <Text style={styles.insightsSectionTitle}>Insights</Text>
               </View>
-            </View>
+              <Text style={styles.insightText}>
+                You made {filteredTransactions.filter((t) => t.optimal).length} optimal decisions ({filteredTransactions.length > 0 ? ((filteredTransactions.filter((t) => t.optimal).length / filteredTransactions.length) * 100).toFixed(0) : 0}%)
+              </Text>
+              {totalMissed > 0 && (
+                <Text style={styles.insightTip}>
+                  You could save an extra ${totalMissed.toFixed(2)} by following all recommendations
+                </Text>
+              )}
+            </Card>
           )}
+
+          <View style={styles.bottomSpacer} />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -298,251 +340,249 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: colors.background.primary,
   },
+
+  // Header
   header: {
-    backgroundColor: '#4A90E2',
-    padding: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    paddingTop: spacing.xl,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
+
+  // Summary
   summarySection: {
     flexDirection: 'row',
-    padding: 20,
-    gap: 12,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: colors.background.card,
+    padding: spacing.base,
+    borderRadius: borderRadius.xl,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...shadows.md,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
   },
+
+  // Filter
   filterSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.base,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    marginRight: 8,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.background.card,
+    marginRight: spacing.sm,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border.light,
   },
   filterButtonActive: {
-    backgroundColor: '#4A90E2',
-    borderColor: '#4A90E2',
+    backgroundColor: colors.primary.main,
+    borderColor: colors.primary.main,
   },
   filterButtonText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
   },
   filterButtonTextActive: {
-    color: '#fff',
+    color: colors.text.inverse,
   },
+
+  // Transactions List
   transactionsList: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.lg,
   },
   transactionItem: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    marginBottom: spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderLeftColor: colors.success.main,
   },
   transactionItemSuboptimal: {
-    borderLeftColor: '#FF9800',
+    borderLeftColor: colors.warning.main,
   },
   transactionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   merchantRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  emojiCircle: {
+  categoryIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F5F7FA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-  },
-  categoryEmoji: {
-    fontSize: 20,
+    marginRight: spacing.md,
   },
   merchantInfo: {
     flex: 1,
   },
   merchantName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
   transactionDate: {
-    fontSize: 13,
-    color: '#666',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
   },
   transactionAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
   },
   cardUsedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardUsedLabel: {
-    fontSize: 13,
-    color: '#666',
-    marginRight: 8,
+    marginBottom: spacing.md,
   },
   cardUsedName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginLeft: spacing.sm,
   },
   optimalBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success[50],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
   },
   optimalBadgeText: {
-    fontSize: 12,
-    color: '#2E7D32',
-    fontWeight: '600',
+    fontSize: typography.fontSize.xs,
+    color: colors.success[700],
+    fontWeight: typography.fontWeight.semibold,
+    marginLeft: spacing.xs,
   },
   suboptimalBadge: {
-    backgroundColor: '#FFF3E0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.warning[50],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
   },
   suboptimalBadgeText: {
-    fontSize: 12,
-    color: '#E65100',
-    fontWeight: '600',
+    fontSize: typography.fontSize.xs,
+    color: colors.warning[700],
+    fontWeight: typography.fontWeight.semibold,
+    marginLeft: spacing.xs,
+    flex: 1,
   },
-  insightsSection: {
-    marginTop: 8,
-    marginBottom: 24,
+
+  // Insights
+  insightsCard: {
+    padding: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  insightsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   insightsSectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  insightCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
   },
   insightText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
     lineHeight: 20,
   },
+  insightTip: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary.main,
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  // Empty State
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing['3xl'],
   },
-  emptyEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
+  emptyIconContainer: {
+    marginBottom: spacing.lg,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: typography.fontSize.base,
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 22,
   },
+
+  // Loading & Error
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing['3xl'],
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
+    marginTop: spacing.md,
+    fontSize: typography.fontSize.base,
+    color: colors.text.secondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing['3xl'],
   },
   errorText: {
-    fontSize: 16,
-    color: '#FF5252',
+    fontSize: typography.fontSize.base,
+    color: colors.error.main,
     textAlign: 'center',
-    marginBottom: 20,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
   },
   retryButton: {
-    backgroundColor: '#4A90E2',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: spacing.xl,
   },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+
+  bottomSpacer: {
+    height: spacing.xl,
   },
 });

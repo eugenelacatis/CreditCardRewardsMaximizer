@@ -1,3 +1,4 @@
+// src/screens/TransactionScreen.js - Modern UI with theme system
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -9,25 +10,31 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '../services/api';
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';
+import { Card, GradientButton, Button, Badge } from '../components/ui';
 
 const CATEGORIES = [
-  { id: 'dining', label: 'Dining', emoji: '🍽️' },
-  { id: 'travel', label: 'Travel', emoji: '✈️' },
-  { id: 'groceries', label: 'Groceries', emoji: '🛒' },
-  { id: 'gas', label: 'Gas', emoji: '⛽' },
-  { id: 'entertainment', label: 'Entertainment', emoji: '🎬' },
-  { id: 'shopping', label: 'Shopping', emoji: '🛍️' },
-  { id: 'other', label: 'Other', emoji: '📦' },
+  { id: 'dining', label: 'Dining', icon: 'silverware-fork-knife', color: colors.error.main },
+  { id: 'travel', label: 'Travel', icon: 'airplane', color: colors.primary.main },
+  { id: 'groceries', label: 'Groceries', icon: 'cart', color: colors.success.main },
+  { id: 'gas', label: 'Gas', icon: 'gas-station', color: colors.warning.main },
+  { id: 'entertainment', label: 'Entertainment', icon: 'movie', color: '#E91E63' },
+  { id: 'shopping', label: 'Shopping', icon: 'shopping', color: colors.secondary.main },
+  { id: 'other', label: 'Other', icon: 'package-variant', color: colors.neutral[500] },
 ];
 
 const GOALS = [
-  { id: 'cash_back', label: 'Cash Back', emoji: '💵' },
-  { id: 'travel_points', label: 'Travel Points', emoji: '✈️' },
-  { id: 'balanced', label: 'Balanced', emoji: '⚖️' },
+  { id: 'cash_back', label: 'Cash Back', icon: 'cash-multiple' },
+  { id: 'travel_points', label: 'Travel Points', icon: 'airplane' },
+  { id: 'balanced', label: 'Balanced', icon: 'scale-balance' },
 ];
 
 export default function TransactionScreen() {
@@ -41,7 +48,6 @@ export default function TransactionScreen() {
   const [userId, setUserId] = useState(null);
 
   useEffect(() => {
-    // Load user ID from AsyncStorage
     const loadUserId = async () => {
       const id = await AsyncStorage.getItem('userId');
       setUserId(id);
@@ -50,7 +56,6 @@ export default function TransactionScreen() {
   }, []);
 
   const handleGetRecommendation = async () => {
-    // Validation
     if (!merchant.trim()) {
       Alert.alert('Error', 'Please enter a merchant name');
       return;
@@ -63,10 +68,8 @@ export default function TransactionScreen() {
     setLoading(true);
 
     try {
-      console.log('Sending request to API...');
-
       const transactionData = {
-        user_id: 'user123',
+        user_id: userId || 'user123',
         merchant: merchant.trim(),
         amount: parseFloat(amount),
         category: selectedCategory,
@@ -74,8 +77,6 @@ export default function TransactionScreen() {
       };
 
       const response = await API.getRecommendation(transactionData);
-      console.log('API Response:', response.data);
-
       setRecommendation(response.data);
       setShowResult(true);
 
@@ -94,11 +95,22 @@ export default function TransactionScreen() {
     const isSelected = selectedCategory === category.id;
     return (
       <TouchableOpacity
-        style={[styles.categoryButton, isSelected && styles.categoryButtonSelected]}
+        style={[
+          styles.categoryButton,
+          isSelected && styles.categoryButtonSelected,
+          isSelected && { borderColor: category.color }
+        ]}
         onPress={() => setSelectedCategory(category.id)}
       >
-        <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-        <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
+        <Icon
+          name={category.icon}
+          size={24}
+          color={isSelected ? category.color : colors.neutral[400]}
+        />
+        <Text style={[
+          styles.categoryText,
+          isSelected && { color: category.color, fontWeight: typography.fontWeight.bold }
+        ]}>
           {category.label}
         </Text>
       </TouchableOpacity>
@@ -112,7 +124,11 @@ export default function TransactionScreen() {
         style={[styles.goalButton, isSelected && styles.goalButtonSelected]}
         onPress={() => setSelectedGoal(goal.id)}
       >
-        <Text style={styles.goalEmoji}>{goal.emoji}</Text>
+        <Icon
+          name={goal.icon}
+          size={20}
+          color={isSelected ? colors.primary.main : colors.neutral[400]}
+        />
         <Text style={[styles.goalText, isSelected && styles.goalTextSelected]}>
           {goal.label}
         </Text>
@@ -129,18 +145,24 @@ export default function TransactionScreen() {
       <Modal visible={showResult} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <ScrollView>
+            <ScrollView showsVerticalScrollIndicator={false}>
               {/* Header */}
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>✨ AI Recommendation</Text>
-                <TouchableOpacity onPress={() => setShowResult(false)}>
-                  <Text style={styles.closeButton}>✕</Text>
+                <View style={styles.modalTitleContainer}>
+                  <Icon name="star" size={24} color={colors.warning.main} />
+                  <Text style={styles.modalTitle}>AI Recommendation</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setShowResult(false)}
+                >
+                  <Icon name="close" size={24} color={colors.text.secondary} />
                 </TouchableOpacity>
               </View>
 
               {/* Recommended Card */}
               <View style={styles.recommendedCard}>
-                <Text style={styles.useThisLabel}>USE THIS CARD</Text>
+                <Badge text="BEST CHOICE" variant="primary" size="small" />
                 <Text style={styles.cardName}>{card.card_name}</Text>
 
                 <View style={styles.valueBox}>
@@ -151,6 +173,7 @@ export default function TransactionScreen() {
                 </View>
 
                 <View style={styles.explanationBox}>
+                  <Icon name="information-outline" size={18} color={colors.primary.main} />
                   <Text style={styles.explanationText}>{card.reason}</Text>
                 </View>
               </View>
@@ -160,29 +183,32 @@ export default function TransactionScreen() {
                 <View style={styles.alternativesSection}>
                   <Text style={styles.alternativesTitle}>Other Options</Text>
                   {recommendation.alternatives.slice(0, 2).map((altCard, idx) => (
-                    <View key={idx} style={styles.alternativeCard}>
-                      <View>
-                        <Text style={styles.alternativeCardName}>{altCard.card_name}</Text>
-                        <Text style={styles.alternativeCardValue}>
-                          {altCard.estimated_value}
-                        </Text>
+                    <Card key={idx} style={styles.alternativeCard}>
+                      <View style={styles.alternativeCardContent}>
+                        <View>
+                          <Text style={styles.alternativeCardName}>{altCard.card_name}</Text>
+                          <Text style={styles.alternativeCardValue}>
+                            {altCard.estimated_value}
+                          </Text>
+                        </View>
+                        <Icon name="chevron-right" size={20} color={colors.neutral[400]} />
                       </View>
-                    </View>
+                    </Card>
                   ))}
                 </View>
               )}
 
               {/* Action Button */}
-              <TouchableOpacity
-                style={styles.doneButton}
+              <GradientButton
+                title="Got It!"
+                icon="check"
                 onPress={() => {
                   setShowResult(false);
                   setMerchant('');
                   setAmount('');
                 }}
-              >
-                <Text style={styles.doneButtonText}>Got It!</Text>
-              </TouchableOpacity>
+                style={styles.doneButton}
+              />
             </ScrollView>
           </View>
         </View>
@@ -192,71 +218,92 @@ export default function TransactionScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>New Transaction</Text>
-          <Text style={styles.subtitle}>Get AI-powered recommendations</Text>
-        </View>
-
-        {/* Form */}
-        <View style={styles.form}>
-          {/* Merchant Input */}
-          <Text style={styles.label}>Where are you shopping?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., Starbucks, Amazon, Whole Foods"
-            value={merchant}
-            onChangeText={setMerchant}
-            placeholderTextColor="#999"
-          />
-
-          {/* Amount Input */}
-          <Text style={styles.label}>How much?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0.00"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            placeholderTextColor="#999"
-          />
-
-          {/* Category Selection */}
-          <Text style={styles.label}>What category?</Text>
-          <View style={styles.categoriesGrid}>
-            {CATEGORIES.map((category) => (
-              <CategoryButton key={category.id} category={category} />
-            ))}
-          </View>
-
-          {/* Goal Selection */}
-          <Text style={styles.label}>Your goal?</Text>
-          <View style={styles.goalsGrid}>
-            {GOALS.map((goal) => (
-              <GoalButton key={goal.id} goal={goal} />
-            ))}
-          </View>
-
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleGetRecommendation}
-            disabled={loading}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header */}
+          <LinearGradient
+            colors={colors.gradients.primary}
+            style={styles.header}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            {loading ? (
-              <>
-                <ActivityIndicator color="#fff" />
-                <Text style={styles.submitButtonText}>  Getting AI Recommendation...</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.submitButtonText}>⚡ Get Smart Recommendation</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+            <Text style={styles.title}>New Transaction</Text>
+            <Text style={styles.subtitle}>Get AI-powered card recommendation</Text>
+          </LinearGradient>
+
+          {/* Form */}
+          <View style={styles.form}>
+            <Card elevated style={styles.formCard}>
+              {/* Merchant Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Where are you shopping?</Text>
+                <View style={styles.inputWrapper}>
+                  <Icon name="store" size={20} color={colors.neutral[400]} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., Starbucks, Amazon, Whole Foods"
+                    value={merchant}
+                    onChangeText={setMerchant}
+                    placeholderTextColor={colors.neutral[400]}
+                  />
+                </View>
+              </View>
+
+              {/* Amount Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>How much?</Text>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.currencySymbol}>$</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="0.00"
+                    value={amount}
+                    onChangeText={setAmount}
+                    keyboardType="decimal-pad"
+                    placeholderTextColor={colors.neutral[400]}
+                  />
+                </View>
+              </View>
+
+              {/* Category Selection */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>What category?</Text>
+                <View style={styles.categoriesGrid}>
+                  {CATEGORIES.map((category) => (
+                    <CategoryButton key={category.id} category={category} />
+                  ))}
+                </View>
+              </View>
+
+              {/* Goal Selection */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Your goal?</Text>
+                <View style={styles.goalsGrid}>
+                  {GOALS.map((goal) => (
+                    <GoalButton key={goal.id} goal={goal} />
+                  ))}
+                </View>
+              </View>
+
+              {/* Submit Button */}
+              <GradientButton
+                title="Get Smart Recommendation"
+                icon="lightbulb-outline"
+                onPress={handleGetRecommendation}
+                loading={loading}
+                disabled={loading}
+                style={styles.submitButton}
+              />
+            </Card>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <ResultModal />
     </SafeAreaView>
@@ -266,272 +313,245 @@ export default function TransactionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: colors.background.primary,
   },
+  keyboardView: {
+    flex: 1,
+  },
+
+  // Header
   header: {
-    backgroundColor: '#4A90E2',
-    padding: 30,
-    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+    paddingTop: spacing['2xl'],
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#fff',
-    marginTop: 4,
-    opacity: 0.9,
+    fontSize: typography.fontSize.sm,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: spacing.xs,
   },
+
+  // Form
   form: {
-    padding: 20,
+    padding: spacing.lg,
+  },
+  formCard: {
+    padding: spacing.lg,
+  },
+  inputGroup: {
+    marginBottom: spacing.lg,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 10,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.tertiary,
+    borderWidth: 1.5,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.base,
   },
   input: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    fontSize: typography.fontSize.md,
+    color: colors.text.primary,
   },
+  currencySymbol: {
+    fontSize: typography.fontSize.lg,
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.semibold,
+  },
+
+  // Categories
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: spacing.sm,
   },
   categoryButton: {
-    width: '30%',
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
+    width: '31%',
+    backgroundColor: colors.background.tertiary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border.light,
   },
   categoryButtonSelected: {
-    borderColor: '#4A90E2',
-    backgroundColor: '#E3F2FD',
-  },
-  categoryEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
+    backgroundColor: colors.primary[50],
   },
   categoryText: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    fontWeight: typography.fontWeight.medium,
   },
-  categoryTextSelected: {
-    color: '#4A90E2',
-    fontWeight: 'bold',
-  },
+
+  // Goals
   goalsGrid: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.sm,
   },
   goalButton: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-  },
-  goalButtonSelected: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#E8F5E9',
-  },
-  goalEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  goalText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  goalTextSelected: {
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  submitButton: {
-    backgroundColor: '#4A90E2',
-    padding: 18,
-    borderRadius: 12,
-    marginTop: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background.tertiary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 2,
+    borderColor: colors.border.light,
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
+  goalButtonSelected: {
+    borderColor: colors.primary.main,
+    backgroundColor: colors.primary[50],
   },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  goalText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginLeft: spacing.xs,
+    fontWeight: typography.fontWeight.medium,
   },
+  goalTextSelected: {
+    color: colors.primary.main,
+    fontWeight: typography.fontWeight.bold,
+  },
+
+  submitButton: {
+    marginTop: spacing.sm,
+  },
+
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.background.modal,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: colors.background.card,
+    borderTopLeftRadius: borderRadius['2xl'],
+    borderTopRightRadius: borderRadius['2xl'],
     maxHeight: '90%',
-    padding: 20,
+    padding: spacing.lg,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.lg,
+  },
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
   },
   closeButton: {
-    fontSize: 28,
-    color: '#666',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+
+  // Recommended Card
   recommendedCard: {
-    backgroundColor: '#F0F8FF',
-    padding: 20,
-    borderRadius: 16,
+    backgroundColor: colors.primary[50],
+    padding: spacing.lg,
+    borderRadius: borderRadius.xl,
     borderWidth: 2,
-    borderColor: '#4A90E2',
-  },
-  useThisLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#4A90E2',
-    marginBottom: 8,
+    borderColor: colors.primary.main,
   },
   cardName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.base,
   },
   valueBox: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: colors.background.secondary,
+    padding: spacing.base,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.base,
+    ...shadows.sm,
   },
   valueLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
   },
   valueAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginTop: 4,
-  },
-  rewardsRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  rewardItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  rewardEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  rewardDivider: {
-    width: 1,
-    backgroundColor: '#E0E0E0',
-    marginHorizontal: 16,
-  },
-  rewardLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  rewardValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 2,
+    fontSize: typography.fontSize['3xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.success.main,
+    marginTop: spacing.xs,
   },
   explanationBox: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.background.secondary,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
   },
   explanationText: {
-    fontSize: 14,
-    color: '#555',
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
     lineHeight: 20,
+    marginLeft: spacing.sm,
   },
-  benefitsBox: {
-    backgroundColor: '#FFF9E6',
-    padding: 12,
-    borderRadius: 8,
-  },
-  benefitsTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  benefitItem: {
-    fontSize: 13,
-    color: '#666',
-    marginLeft: 8,
-    marginVertical: 2,
-  },
+
+  // Alternatives
   alternativesSection: {
-    marginTop: 20,
+    marginTop: spacing.lg,
   },
   alternativesTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
   },
   alternativeCard: {
-    backgroundColor: '#F9F9F9',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
+  },
+  alternativeCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   alternativeCardName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
   },
   alternativeCardValue: {
-    fontSize: 12,
-    color: '#4CAF50',
-    marginTop: 4,
+    fontSize: typography.fontSize.sm,
+    color: colors.success.main,
+    marginTop: spacing.xs,
   },
+
   doneButton: {
-    backgroundColor: '#4A90E2',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  doneButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
   },
 });

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '../services/api';
 import LocationService from '../services/locationService';
 import NearbyPlacesCard from '../components/NearbyPlacesCard';
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';
+import { Card, GradientCard, Button, GradientButton, Badge, StatCard, EmptyState, LoadingState } from '../components/ui';
 
 export default function HomeScreen({ navigation }) {
   const [stats, setStats] = useState({
@@ -38,18 +42,16 @@ export default function HomeScreen({ navigation }) {
       const fullName = await AsyncStorage.getItem('userFullName');
 
       if (fullName) {
-        setUserName(fullName.split(' ')[0]); // Get first name
+        setUserName(fullName.split(' ')[0]);
       }
 
       if (userId) {
-        // Check if user has cards in wallet
         try {
           const walletResponse = await API.getWalletCards(userId);
           const walletCards = Array.isArray(walletResponse.data) ? walletResponse.data : [];
           setHasCards(walletCards.length > 0);
           setCardsError(false);
         } catch (err) {
-          // If 404, user has no cards - this is normal for new users
           if (err.response?.status === 404) {
             setHasCards(false);
             setCardsError(false);
@@ -58,18 +60,15 @@ export default function HomeScreen({ navigation }) {
           }
         }
 
-        // Fetch stats
         try {
           const response = await API.getUserStats(userId);
           setStats(response.data);
         } catch (error) {
           console.error('Error fetching stats:', error);
-          // Keep default values on error
         }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
-      // Keep default values on error
     } finally {
       setLoading(false);
     }
@@ -86,15 +85,12 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      // Check if permission already granted
       const permissionStatus = await LocationService.getPermissionStatus();
 
       if (!permissionStatus.granted) {
-        // Check if we've asked before
         const hasAsked = await LocationService.hasRequestedPermission();
 
         if (!hasAsked) {
-          // First time - request permission
           const result = await LocationService.requestPermission();
           setLocationPermission(result.status);
 
@@ -103,7 +99,6 @@ export default function HomeScreen({ navigation }) {
             return;
           }
         } else {
-          // Already asked before and denied
           setLocationError('Location permission required. Please enable in settings.');
           return;
         }
@@ -111,7 +106,6 @@ export default function HomeScreen({ navigation }) {
         setLocationPermission('granted');
       }
 
-      // Get current location
       const location = await LocationService.getCurrentLocation();
 
       if (!location) {
@@ -119,14 +113,11 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      console.log('Current location:', location);
-
-      // Fetch nearby recommendations (default $50 for estimates)
       const response = await API.getLocationBasedRecommendations(
         userId,
         location.latitude,
         location.longitude,
-        2000 // 2km radius
+        2000
       );
 
       setNearbyRecommendations(response.data.top_recommendations || []);
@@ -152,7 +143,6 @@ export default function HomeScreen({ navigation }) {
     setSelectedCard(null);
     setModalVisible(true);
 
-    // Fetch user's cards for selection
     setLoadingCards(true);
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -161,7 +151,6 @@ export default function HomeScreen({ navigation }) {
         const cards = Array.isArray(response.data) ? response.data : [];
         setUserCards(cards);
 
-        // Pre-select the recommended card if it exists in user's wallet
         const recommendedCardId = recommendation.recommended_card.card_id;
         const matchingCard = cards.find(c => c.card_id === recommendedCardId);
         if (matchingCard) {
@@ -177,84 +166,33 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  // Map place categories to valid transaction categories
   const mapPlaceCategoryToTransactionCategory = (placeCategory) => {
     const categoryMap = {
-      // Dining categories
-      'dining': 'dining',
-      'restaurant': 'dining',
-      'cafe': 'dining',
-      'bar': 'dining',
-      'fast_food': 'dining',
-      'food': 'dining',
-      // Groceries categories
-      'groceries': 'groceries',
-      'supermarket': 'groceries',
-      'grocery': 'groceries',
-      'convenience': 'groceries',
-      // Gas categories
-      'gas': 'gas',
-      'fuel': 'gas',
-      'gas_station': 'gas',
-      // Entertainment categories
-      'entertainment': 'entertainment',
-      'cinema': 'entertainment',
-      'theatre': 'entertainment',
-      // Travel categories
-      'travel': 'travel',
-      'hotel': 'travel',
-      'airport': 'travel',
-      // Shopping categories
-      'shopping': 'shopping',
-      'shop': 'shopping',
-      'mall': 'shopping',
-      'store': 'shopping',
-      'retail': 'shopping',
-      // Other
+      'dining': 'dining', 'restaurant': 'dining', 'cafe': 'dining', 'bar': 'dining', 'fast_food': 'dining', 'food': 'dining',
+      'groceries': 'groceries', 'supermarket': 'groceries', 'grocery': 'groceries', 'convenience': 'groceries',
+      'gas': 'gas', 'fuel': 'gas', 'gas_station': 'gas',
+      'entertainment': 'entertainment', 'cinema': 'entertainment', 'theatre': 'entertainment',
+      'travel': 'travel', 'hotel': 'travel', 'airport': 'travel',
+      'shopping': 'shopping', 'shop': 'shopping', 'mall': 'shopping', 'store': 'shopping', 'retail': 'shopping',
       'other': 'other',
     };
-
-    const lowerCategory = placeCategory.toLowerCase();
-    return categoryMap[lowerCategory] || 'other';
+    return categoryMap[placeCategory.toLowerCase()] || 'other';
   };
 
-  // Calculate rewards based on card and category
   const calculateReward = (card, category, amount) => {
     if (!card || !amount) return 0;
-
-    // Get cash back rate and points multiplier for this category
     const cashBackRates = card.cash_back_rate || {};
     const pointsMultipliers = card.points_multiplier || {};
+    const POINT_VALUE = 0.015;
 
-    // Log for debugging
-    console.log('calculateReward called:');
-    console.log('  Card:', card.card_name);
-    console.log('  Category:', category);
-    console.log('  Amount:', amount);
-    console.log('  Cash back rates:', JSON.stringify(cashBackRates));
-    console.log('  Points multipliers:', JSON.stringify(pointsMultipliers));
-
-    // Calculate cash back reward
-    let cashBackRate = cashBackRates[category] || cashBackRates[category.toLowerCase()] ||
-                       cashBackRates['default'] || cashBackRates['other'] || 0;
+    let cashBackRate = cashBackRates[category] || cashBackRates[category.toLowerCase()] || cashBackRates['default'] || cashBackRates['other'] || 0;
     const cashBackReward = amount * cashBackRate;
 
-    // Calculate points reward (convert points to dollar value)
-    // Using 1.5 cents per point to match backend calculation
-    const POINT_VALUE = 0.015; // 1.5 cents per point
-    let pointsMultiplier = pointsMultipliers[category] || pointsMultipliers[category.toLowerCase()] ||
-                          pointsMultipliers['default'] || pointsMultipliers['other'] || 0;
+    let pointsMultiplier = pointsMultipliers[category] || pointsMultipliers[category.toLowerCase()] || pointsMultipliers['default'] || pointsMultipliers['other'] || 0;
     const pointsEarned = amount * pointsMultiplier;
     const pointsReward = pointsEarned * POINT_VALUE;
 
-    // Total reward is the higher of cash back or points value
-    const totalReward = Math.max(cashBackReward, pointsReward);
-
-    console.log('  Cash back rate:', cashBackRate, '-> $', cashBackReward.toFixed(2));
-    console.log('  Points multiplier:', pointsMultiplier, '-> pts:', pointsEarned.toFixed(0), '-> $', pointsReward.toFixed(2));
-    console.log('  Total reward:', totalReward.toFixed(2));
-
-    return totalReward;
+    return Math.max(cashBackReward, pointsReward);
   };
 
   const handleCreateTransaction = async () => {
@@ -278,18 +216,11 @@ export default function HomeScreen({ navigation }) {
 
       const amount = parseFloat(transactionAmount);
       const recommendation = selectedRecommendation;
-
-      // Map the place category to a valid transaction category
       const transactionCategory = mapPlaceCategoryToTransactionCategory(recommendation.place.category);
-
-      // Calculate rewards based on the selected card's rates
       const totalReward = calculateReward(selectedCard, transactionCategory, amount);
 
-      // Calculate optimal reward (what they would have gotten with recommended card)
       const recommendedCard = userCards.find(c => c.card_id === recommendation.recommended_card.card_id);
-      const optimalReward = recommendedCard
-        ? calculateReward(recommendedCard, transactionCategory, amount)
-        : totalReward;
+      const optimalReward = recommendedCard ? calculateReward(recommendedCard, transactionCategory, amount) : totalReward;
 
       const transactionData = {
         user_id: userId,
@@ -308,14 +239,12 @@ export default function HomeScreen({ navigation }) {
 
       await API.createTransaction(transactionData);
 
-      // Close modal and refresh data
       setModalVisible(false);
       setSelectedRecommendation(null);
       setTransactionAmount('');
       setSelectedCard(null);
       setUserCards([]);
 
-      // Refresh stats to show updated totals
       await fetchUserData();
 
       const isOptimal = selectedCard.card_id === recommendation.recommended_card.card_id;
@@ -334,109 +263,162 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     fetchUserData();
-    // Request location permission and fetch recommendations on mount
     requestLocationPermissionAndFetchRecommendations();
   }, []);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary.main}
+          />
         }
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>💳 Agentic Wallet</Text>
-          <Text style={styles.subtitle}>AI-Powered Card Optimizer</Text>
-        </View>
+        {/* Header */}
+        <LinearGradient
+          colors={colors.gradients.primary}
+          style={styles.header}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.greeting}>{getGreeting()}</Text>
+              <Text style={styles.userName}>{userName || 'there'}</Text>
+            </View>
+          </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome{userName ? ` ${userName}` : ''}! 👋</Text>
-          <Text style={styles.cardText}>
-            Your intelligent credit card recommendation system is ready.
-          </Text>
-          {!loading && !hasCards ? (
-            <Text style={styles.cardText}>
-              Get started by adding your credit cards in the Cards tab!
-            </Text>
+          {/* Quick Stats in Header */}
+          {!loading && hasCards && (
+            <View style={styles.headerStats}>
+              <View style={styles.headerStatItem}>
+                <Text style={styles.headerStatValue}>${stats.total_rewards.toFixed(2)}</Text>
+                <Text style={styles.headerStatLabel}>Total Rewards</Text>
+              </View>
+              <View style={styles.headerStatDivider} />
+              <View style={styles.headerStatItem}>
+                <Text style={styles.headerStatValue}>{stats.optimization_rate.toFixed(0)}%</Text>
+                <Text style={styles.headerStatLabel}>Optimized</Text>
+              </View>
+            </View>
+          )}
+        </LinearGradient>
+
+        <View style={styles.content}>
+          {loading ? (
+            <LoadingState text="Loading your dashboard..." />
+          ) : !hasCards ? (
+            <View style={styles.noCardsSection}>
+              <GradientCard gradientColors={colors.gradients.purple} style={styles.welcomeCard}>
+                <Icon name="wallet-giftcard" size={48} color={colors.text.inverse} />
+                <Text style={styles.welcomeTitle}>Welcome to Agentic Wallet</Text>
+                <Text style={styles.welcomeText}>
+                  Add your credit cards to start getting AI-powered recommendations and maximize your rewards!
+                </Text>
+              </GradientCard>
+
+              <Card elevated style={styles.actionCard}>
+                <View style={styles.actionCardContent}>
+                  <View style={styles.actionCardIcon}>
+                    <Icon name="credit-card-plus" size={32} color={colors.primary.main} />
+                  </View>
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>Add Your First Card</Text>
+                    <Text style={styles.actionCardDescription}>Browse our card library and add cards to your wallet</Text>
+                  </View>
+                </View>
+                <GradientButton
+                  title="Browse Cards"
+                  icon="arrow-right"
+                  iconPosition="right"
+                  onPress={() => navigation.navigate('Cards')}
+                  style={styles.actionCardButton}
+                />
+              </Card>
+            </View>
           ) : (
-            <Text style={styles.cardText}>
-              Tap the Transaction tab below to get AI-powered recommendations!
-            </Text>
+            <>
+              {/* Stats Grid */}
+              <View style={styles.statsGrid}>
+                <StatCard
+                  label="Transactions"
+                  value={stats.total_transactions}
+                  icon="receipt"
+                  iconColor={colors.primary.main}
+                  style={styles.statCardItem}
+                />
+                <StatCard
+                  label="Total Spent"
+                  value={`$${stats.total_spent.toFixed(0)}`}
+                  icon="cash"
+                  iconColor={colors.secondary.main}
+                  style={styles.statCardItem}
+                />
+              </View>
+            </>
+          )}
+
+          {/* Location-based recommendations */}
+          {loadingLocation && (
+            <Card style={styles.locationCard}>
+              <View style={styles.locationLoadingContent}>
+                <ActivityIndicator size="small" color={colors.primary.main} />
+                <Text style={styles.locationLoadingText}>Finding nearby places...</Text>
+              </View>
+            </Card>
+          )}
+
+          {!loadingLocation && locationError && (
+            <Card style={[styles.locationCard, styles.locationErrorCard]}>
+              <View style={styles.locationErrorContent}>
+                <Icon name="map-marker-off" size={24} color={colors.warning.main} />
+                <Text style={styles.locationErrorText}>{locationError}</Text>
+              </View>
+              <Button
+                title="Try Again"
+                variant="primary"
+                size="small"
+                onPress={requestLocationPermissionAndFetchRecommendations}
+              />
+            </Card>
+          )}
+
+          {!loadingLocation && !locationError && nearbyRecommendations.length > 0 && (
+            <NearbyPlacesCard
+              recommendations={nearbyRecommendations}
+              onRefresh={requestLocationPermissionAndFetchRecommendations}
+              onRecommendationPress={handleRecommendationPress}
+            />
+          )}
+
+          {!loading && stats.total_transactions > 0 && (
+            <Card elevated style={styles.insightCard}>
+              <View style={styles.insightHeader}>
+                <Icon name="lightbulb-outline" size={24} color={colors.warning.main} />
+                <Text style={styles.insightTitle}>Performance Insight</Text>
+              </View>
+              <Text style={styles.insightText}>
+                You've spent ${stats.total_spent.toFixed(2)} across {stats.total_transactions} transactions with a {stats.optimization_rate.toFixed(0)}% optimization rate.
+              </Text>
+              {stats.optimization_rate < 80 && (
+                <Text style={styles.insightTip}>
+                  Tip: Follow card recommendations to increase your optimization rate!
+                </Text>
+              )}
+            </Card>
           )}
         </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4A90E2" />
-            <Text style={styles.loadingText}>Loading your stats...</Text>
-          </View>
-        ) : !hasCards ? (
-          <View style={styles.noCardsContainer}>
-            <Text style={styles.noCardsEmoji}>🃏</Text>
-            <Text style={styles.noCardsTitle}>No Cards Yet</Text>
-            <Text style={styles.noCardsText}>
-              Add your credit cards to start getting personalized recommendations and maximize your rewards!
-            </Text>
-            <TouchableOpacity
-              style={styles.addCardsButton}
-              onPress={() => navigation.navigate('Cards')}
-            >
-              <Text style={styles.addCardsButtonText}>📚 Add Cards Now</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.statsContainer}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>${stats.total_rewards.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>Total Rewards</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats.total_transactions}</Text>
-              <Text style={styles.statLabel}>Transactions</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Location-based recommendations */}
-        {loadingLocation && (
-          <View style={styles.locationLoadingCard}>
-            <ActivityIndicator size="small" color="#4A90E2" />
-            <Text style={styles.locationLoadingText}>Finding nearby places...</Text>
-          </View>
-        )}
-
-        {!loadingLocation && locationError && (
-          <View style={styles.locationErrorCard}>
-            <Text style={styles.locationErrorText}>📍 {locationError}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={requestLocationPermissionAndFetchRecommendations}
-            >
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {!loadingLocation && !locationError && nearbyRecommendations.length > 0 && (
-          <NearbyPlacesCard
-            recommendations={nearbyRecommendations}
-            onRefresh={requestLocationPermissionAndFetchRecommendations}
-            onRecommendationPress={handleRecommendationPress}
-          />
-        )}
-
-        {!loading && stats.total_transactions > 0 && (
-          <View style={styles.insightCard}>
-            <Text style={styles.insightTitle}>📊 Your Performance</Text>
-            <Text style={styles.insightText}>
-              Total Spent: ${stats.total_spent.toFixed(2)}
-            </Text>
-            <Text style={styles.insightText}>
-              Optimization Rate: {stats.optimization_rate.toFixed(0)}%
-            </Text>
-          </View>
-        )}
       </ScrollView>
 
       {/* Transaction Modal */}
@@ -453,21 +435,31 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.modalContent}>
             {selectedRecommendation && (
               <>
-                <Text style={styles.modalTitle}>Add Transaction</Text>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Add Transaction</Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setModalVisible(false)}
+                  >
+                    <Icon name="close" size={24} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                </View>
 
                 <View style={styles.modalPlaceInfo}>
                   <Text style={styles.modalPlaceName}>
                     {selectedRecommendation.place.name}
                   </Text>
-                  <Text style={styles.modalPlaceCategory}>
-                    {selectedRecommendation.place.category}
-                  </Text>
+                  <Badge
+                    text={selectedRecommendation.place.category}
+                    variant="primary"
+                    size="small"
+                  />
                 </View>
 
                 <View style={styles.modalCardSection}>
                   <Text style={styles.modalSectionLabel}>Select Card Used:</Text>
                   {loadingCards ? (
-                    <ActivityIndicator size="small" color="#4A90E2" style={{ marginVertical: 10 }} />
+                    <ActivityIndicator size="small" color={colors.primary.main} style={{ marginVertical: 10 }} />
                   ) : (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardScrollView}>
                       {userCards.map((card) => {
@@ -490,7 +482,7 @@ export default function HomeScreen({ navigation }) {
                               {card.card_name}
                             </Text>
                             {isRecommended && (
-                              <Text style={styles.recommendedBadge}>Recommended</Text>
+                              <Badge text="Best" variant="success" size="small" />
                             )}
                           </TouchableOpacity>
                         );
@@ -506,6 +498,7 @@ export default function HomeScreen({ navigation }) {
                     <TextInput
                       style={styles.modalInput}
                       placeholder="0.00"
+                      placeholderTextColor={colors.neutral[400]}
                       keyboardType="decimal-pad"
                       value={transactionAmount}
                       onChangeText={setTransactionAmount}
@@ -528,8 +521,9 @@ export default function HomeScreen({ navigation }) {
                 )}
 
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={styles.modalCancelButton}
+                  <Button
+                    title="Cancel"
+                    variant="secondary"
                     onPress={() => {
                       setModalVisible(false);
                       setSelectedRecommendation(null);
@@ -537,24 +531,16 @@ export default function HomeScreen({ navigation }) {
                       setSelectedCard(null);
                       setUserCards([]);
                     }}
-                  >
-                    <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
+                    style={styles.modalCancelButton}
+                  />
 
-                  <TouchableOpacity
-                    style={[
-                      styles.modalConfirmButton,
-                      creatingTransaction && styles.modalButtonDisabled
-                    ]}
+                  <GradientButton
+                    title="Add Transaction"
                     onPress={handleCreateTransaction}
+                    loading={creatingTransaction}
                     disabled={creatingTransaction}
-                  >
-                    {creatingTransaction ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.modalConfirmButtonText}>Add Transaction</Text>
-                    )}
-                  </TouchableOpacity>
+                    style={styles.modalConfirmButton}
+                  />
                 </View>
               </>
             )}
@@ -568,376 +554,332 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: colors.background.primary,
   },
+
+  // Header
   header: {
-    backgroundColor: '#4A90E2',
-    padding: 30,
-    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+    borderBottomLeftRadius: borderRadius['2xl'],
+    borderBottomRightRadius: borderRadius['2xl'],
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#fff',
-    opacity: 0.9,
-  },
-  card: {
-    backgroundColor: '#fff',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  cardText: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 24,
-    marginBottom: 8,
-  },
-  statsContainer: {
+  headerContent: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 15,
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  statBox: {
+  greeting: {
+    fontSize: typography.fontSize.base,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  userName: {
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
+    marginTop: spacing.xs,
+  },
+  headerStats: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: borderRadius.xl,
+    padding: spacing.base,
+    marginTop: spacing.lg,
+  },
+  headerStatItem: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  statNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#4A90E2',
-    marginBottom: 8,
+  headerStatDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginHorizontal: spacing.base,
   },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
+  headerStatValue: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  headerStatLabel: {
+    fontSize: typography.fontSize.xs,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: spacing.xs,
+  },
+
+  // Content
+  content: {
+    padding: spacing.lg,
+    paddingTop: spacing.xl,
+  },
+
+  // No Cards Section
+  noCardsSection: {
+    gap: spacing.base,
+  },
+  welcomeCard: {
+    padding: spacing.xl,
     alignItems: 'center',
-    padding: 40,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  noCardsContainer: {
-    backgroundColor: '#fff',
-    margin: 20,
-    padding: 30,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  noCardsEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  noCardsTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  noCardsText: {
-    fontSize: 16,
-    color: '#666',
+  welcomeTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
+    marginTop: spacing.base,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
   },
-  addCardsButton: {
-    backgroundColor: '#4A90E2',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  addCardsButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  insightCard: {
-    backgroundColor: '#fff',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  insightTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  insightText: {
-    fontSize: 15,
-    color: '#666',
-    marginBottom: 8,
+  welcomeText: {
+    fontSize: typography.fontSize.base,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginTop: spacing.sm,
     lineHeight: 22,
   },
-  locationLoadingCard: {
-    backgroundColor: '#fff',
-    margin: 20,
-    marginTop: 10,
-    padding: 20,
-    borderRadius: 12,
+  actionCard: {
+    padding: spacing.lg,
+  },
+  actionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.base,
+  },
+  actionCardIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.primary[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.base,
+  },
+  actionCardText: {
+    flex: 1,
+  },
+  actionCardTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  actionCardDescription: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+  },
+  actionCardButton: {
+    marginTop: spacing.sm,
+  },
+
+  // Stats Grid
+  statsGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  statCardItem: {
+    flex: 1,
+  },
+
+  // Location Card
+  locationCard: {
+    marginBottom: spacing.base,
+  },
+  locationLoadingContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: spacing.sm,
   },
   locationLoadingText: {
-    marginLeft: 12,
-    fontSize: 15,
-    color: '#666',
+    marginLeft: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
   },
   locationErrorCard: {
-    backgroundColor: '#FFF3E0',
-    margin: 20,
-    marginTop: 10,
-    padding: 20,
-    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FFB74D',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: colors.warning[200],
+    backgroundColor: colors.warning[50],
+  },
+  locationErrorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   locationErrorText: {
-    fontSize: 14,
-    color: '#E65100',
-    marginBottom: 12,
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    color: colors.warning[700],
+    marginLeft: spacing.sm,
+  },
+
+  // Insight Card
+  insightCard: {
+    padding: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  insightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  insightTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
+  },
+  insightText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
     lineHeight: 20,
   },
-  retryButton: {
-    backgroundColor: '#4A90E2',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
+  insightTip: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary.main,
+    marginTop: spacing.sm,
+    fontWeight: typography.fontWeight.medium,
   },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // Modal styles
+
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.background.modal,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    backgroundColor: colors.background.card,
+    borderTopLeftRadius: borderRadius['2xl'],
+    borderTopRightRadius: borderRadius['2xl'],
+    padding: spacing.lg,
+    paddingBottom: spacing['3xl'],
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-    textAlign: 'center',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalPlaceInfo: {
-    backgroundColor: '#F5F7FA',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+    backgroundColor: colors.background.tertiary,
+    padding: spacing.base,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.base,
   },
   modalPlaceName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  modalPlaceCategory: {
-    fontSize: 14,
-    color: '#666',
-    textTransform: 'capitalize',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   modalCardSection: {
-    marginBottom: 15,
+    marginBottom: spacing.base,
   },
   modalSectionLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   cardScrollView: {
-    marginHorizontal: -5,
+    marginHorizontal: -spacing.xs,
   },
   cardOption: {
-    backgroundColor: '#F5F7FA',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginHorizontal: 5,
+    backgroundColor: colors.background.tertiary,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginHorizontal: spacing.xs,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border.light,
     minWidth: 120,
     alignItems: 'center',
   },
   cardOptionSelected: {
-    borderColor: '#4A90E2',
-    backgroundColor: '#E3F2FD',
+    borderColor: colors.primary.main,
+    backgroundColor: colors.primary[50],
   },
   cardOptionRecommended: {
-    borderColor: '#4CAF50',
+    borderColor: colors.success.main,
   },
   cardOptionName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
     textAlign: 'center',
+    marginBottom: spacing.xs,
   },
   cardOptionNameSelected: {
-    color: '#4A90E2',
-  },
-  recommendedBadge: {
-    fontSize: 10,
-    color: '#4CAF50',
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  modalCardInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalCardLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 8,
-  },
-  modalCardName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4A90E2',
+    color: colors.primary.main,
   },
   modalInputContainer: {
-    marginBottom: 15,
+    marginBottom: spacing.base,
   },
   modalInputLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   modalInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: colors.background.tertiary,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.base,
+    borderWidth: 1.5,
+    borderColor: colors.border.light,
   },
   modalCurrencySymbol: {
-    fontSize: 24,
-    color: '#333',
-    fontWeight: '600',
-    marginRight: 5,
+    fontSize: typography.fontSize['2xl'],
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.semibold,
+    marginRight: spacing.xs,
   },
   modalInput: {
     flex: 1,
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#333',
-    paddingVertical: 15,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    paddingVertical: spacing.base,
   },
   modalRewardPreview: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
+    backgroundColor: colors.success[50],
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.lg,
   },
   modalRewardLabel: {
-    fontSize: 14,
-    color: '#2E7D32',
+    fontSize: typography.fontSize.sm,
+    color: colors.success[700],
   },
   modalRewardAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E7D32',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.success[700],
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   modalCancelButton: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  modalCancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
   },
   modalConfirmButton: {
     flex: 1,
-    backgroundColor: '#4A90E2',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalConfirmButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  modalButtonDisabled: {
-    opacity: 0.7,
   },
 });
