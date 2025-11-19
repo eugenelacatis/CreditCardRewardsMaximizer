@@ -10,6 +10,8 @@ import {
   ScrollView,
 } from 'react-native';
 
+const DEFAULT_RESULT_LIMIT = 100;
+
 export default function MerchantAutocomplete({
   value,
   onMerchantSelect,
@@ -27,61 +29,43 @@ export default function MerchantAutocomplete({
     setQuery(value || '');
   }, [value]);
 
-  const loadAllMerchants = async () => {
-    // Don't search if we're in the middle of selecting a merchant
+  const fetchMerchants = async (searchQuery = '') => {
     if (isSelectingMerchant) return;
 
     setLoading(true);
 
     try {
-      // Load all merchants (no query parameter)
-      const response = await fetch(`${apiUrl}/api/v1/merchants`);
-      
+      const params = new URLSearchParams({
+        q: searchQuery,
+        limit: String(DEFAULT_RESULT_LIMIT),
+      });
+
+      const response = await fetch(`${apiUrl}/api/v1/merchants/search?${params.toString()}`);
+
       if (response.ok) {
         const data = await response.json();
         setResults(data || []);
       } else {
-        console.error('Merchant load error:', response.status);
+        console.error('Merchant fetch error:', response.status);
         setResults([]);
       }
     } catch (error) {
-      console.error('Merchant load error:', error);
+      console.error('Merchant fetch error:', error);
       setResults([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const loadAllMerchants = () => fetchMerchants('');
+
   const searchMerchants = async (searchQuery) => {
-    // Don't search if we're in the middle of selecting a merchant
-    if (isSelectingMerchant) return;
-    
-    // If empty query, show all merchants
     if (!searchQuery || searchQuery.trim() === '') {
       loadAllMerchants();
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const response = await fetch(
-        `${apiUrl}/api/v1/merchants/search?q=${encodeURIComponent(searchQuery)}`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data || []);
-      } else {
-        console.error('Merchant search error:', response.status);
-        setResults([]);
-      }
-    } catch (error) {
-      console.error('Merchant search error:', error);
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
+    fetchMerchants(searchQuery);
   };
 
   const handleTextChange = (text) => {
@@ -176,20 +160,12 @@ export default function MerchantAutocomplete({
         onFocus={handleFocus}
         onBlur={handleBlur}
         onSubmitEditing={() => {
-          // Handle Enter key
-          if (results.length > 0) {
-            // Select first result from filtered list
-            handleSelectMerchant(results[0]);
-          } else {
-            // No results - just close dropdown and keep typed text
-            setShowResults(false);
-            setResults([]);
-            Keyboard.dismiss();
-            
-            // Still notify parent with typed text (manual entry)
-            if (query.trim() && onMerchantSelect) {
-              onMerchantSelect(query.trim());
-            }
+          setShowResults(false);
+          setResults([]);
+          Keyboard.dismiss();
+
+          if (query.trim() && onMerchantSelect) {
+            onMerchantSelect(query.trim());
           }
         }}
         placeholderTextColor="#999"
@@ -212,7 +188,7 @@ export default function MerchantAutocomplete({
               keyboardShouldPersistTaps="handled"
               nestedScrollEnabled={true}
             >
-              {results.slice(0, 50).map((merchant, index) => (
+              {results.slice(0, DEFAULT_RESULT_LIMIT).map((merchant, index) => (
                 <TouchableOpacity
                   key={`${merchant.merchant_id}-${index}`}
                   style={styles.resultItem}
@@ -232,10 +208,10 @@ export default function MerchantAutocomplete({
                   </View>
                 </TouchableOpacity>
               ))}
-              {results.length > 50 && (
+              {results.length > DEFAULT_RESULT_LIMIT && (
                 <View style={styles.moreResultsHint}>
                   <Text style={styles.moreResultsText}>
-                    + {results.length - 50} more merchants
+                    + {results.length - DEFAULT_RESULT_LIMIT} more merchants
                   </Text>
                   <Text style={styles.moreResultsSubtext}>
                     Keep typing to narrow results
