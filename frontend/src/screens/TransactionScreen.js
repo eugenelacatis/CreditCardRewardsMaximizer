@@ -26,17 +26,10 @@ const CATEGORIES = [
   { id: 'other', label: 'Other', emoji: '📦' },
 ];
 
-const GOALS = [
-  { id: 'cash_back', label: 'Cash Back', emoji: '💵' },
-  { id: 'travel_points', label: 'Travel Points', emoji: '✈️' },
-  { id: 'balanced', label: 'Balanced', emoji: '⚖️' },
-];
-
 export default function TransactionScreen() {
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('dining');
-  const [selectedGoal, setSelectedGoal] = useState('cash_back');
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [recommendation, setRecommendation] = useState(null);
@@ -81,7 +74,6 @@ export default function TransactionScreen() {
         merchant: merchant.trim(),
         amount: parseFloat(amount),
         category: selectedCategory,
-        optimization_goal: selectedGoal,
       };
 
       const response = await API.getRecommendation(transactionData);
@@ -111,21 +103,6 @@ export default function TransactionScreen() {
         <Text style={styles.categoryEmoji}>{category.emoji}</Text>
         <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
           {category.label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const GoalButton = ({ goal }) => {
-    const isSelected = selectedGoal === goal.id;
-    return (
-      <TouchableOpacity
-        style={[styles.goalButton, isSelected && styles.goalButtonSelected]}
-        onPress={() => setSelectedGoal(goal.id)}
-      >
-        <Text style={styles.goalEmoji}>{goal.emoji}</Text>
-        <Text style={[styles.goalText, isSelected && styles.goalTextSelected]}>
-          {goal.label}
         </Text>
       </TouchableOpacity>
     );
@@ -243,14 +220,6 @@ export default function TransactionScreen() {
             ))}
           </View>
 
-          {/* Goal Selection */}
-          <Text style={styles.label}>Your goal?</Text>
-          <View style={styles.goalsGrid}>
-            {GOALS.map((goal) => (
-              <GoalButton key={goal.id} goal={goal} />
-            ))}
-          </View>
-
           {/* Submit Button */}
           <TouchableOpacity
             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
@@ -349,35 +318,6 @@ const styles = StyleSheet.create({
   },
   categoryTextSelected: {
     color: '#4A90E2',
-    fontWeight: 'bold',
-  },
-  goalsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  goalButton: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-  },
-  goalButtonSelected: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#E8F5E9',
-  },
-  goalEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  goalText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  goalTextSelected: {
-    color: '#4CAF50',
     fontWeight: 'bold',
   },
   submitButton: {
