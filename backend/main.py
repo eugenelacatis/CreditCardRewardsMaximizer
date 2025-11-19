@@ -5,7 +5,6 @@ Replaces mock database with real PostgreSQL operations
 
 from dotenv import load_dotenv
 import os
-import logging
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,9 +16,18 @@ from typing import List, Optional, Dict
 from enum import Enum
 from datetime import datetime
 from sqlalchemy.orm import Session
+from prometheus_client import make_asgi_app
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Import observability components
+from logging_config import get_api_logger, get_correlation_id
+from middleware import ObservabilityMiddleware
+from metrics import (
+    track_recommendation, update_business_metrics,
+    USERS_TOTAL, CARDS_REGISTERED, TRANSACTIONS_TOTAL
+)
+
+# Configure structured logging
+logger = get_api_logger()
 
 # Import database and CRUD operations
 from database import get_db, init_db, db as database
@@ -60,6 +68,9 @@ app = FastAPI(
     description="AI-Powered Credit Card Rewards Optimizer with PostgreSQL"
 )
 
+# Add observability middleware (must be added before CORS)
+app.add_middleware(ObservabilityMiddleware)
+
 # CORS middleware for React Native
 app.add_middleware(
     CORSMiddleware,
@@ -68,6 +79,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Prometheus metrics endpoint
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 
 # ============================================================================
@@ -330,23 +345,39 @@ class LocationBasedRecommendationResponse(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize database on startup"""
-    print("🚀 Starting Agentic Wallet API...")
-    
+    logger.info("Starting Agentic Wallet API", extra={'event': 'startup'})
+
     # Check database connection
     if database.health_check():
-        print("✅ Database connection healthy")
+        logger.info("Database connection healthy", extra={'event': 'db_health_check', 'status': 'healthy'})
     else:
-        print("❌ Database connection failed!")
+        logger.error("Database connection failed", extra={'event': 'db_health_check', 'status': 'failed'})
         raise Exception("Database connection failed")
-    
-    print("✨ API ready to accept requests")
+
+    # Update business metrics
+    try:
+        from sqlalchemy import func
+        from models import User as UserModel, CreditCard as CreditCardModel
+        db = next(get_db())
+        user_count = db.query(func.count(UserModel.user_id)).scalar() or 0
+        card_count = db.query(func.count(CreditCardModel.card_id)).scalar() or 0
+        update_business_metrics(users=user_count, cards=card_count)
+        logger.info("Business metrics initialized", extra={
+            'event': 'metrics_init',
+            'users': user_count,
+            'cards': card_count
+        })
+    except Exception as e:
+        logger.warning(f"Could not initialize business metrics: {e}")
+
+    logger.info("API ready to accept requests", extra={'event': 'startup_complete'})
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database connections on shutdown"""
     database.close()
-    print("👋 Shutting down API...")
+    logger.info("Shutting down API", extra={'event': 'shutdown'})
 
 
 # ============================================================================
@@ -355,12 +386,29 @@ async def shutdown_event():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with detailed component status"""
     db_healthy = database.health_check()
+
+    # Check Groq API availability
+    groq_available = bool(os.getenv("GROQ_API_KEY"))
+
+    # Overall status
+    is_healthy = db_healthy and groq_available
+
     return {
-        "status": "healthy" if db_healthy else "unhealthy",
-        "database": "connected" if db_healthy else "disconnected",
-        "timestamp": datetime.utcnow()
+        "status": "healthy" if is_healthy else "degraded",
+        "components": {
+            "database": {
+                "status": "healthy" if db_healthy else "unhealthy",
+                "type": "postgresql"
+            },
+            "ai_service": {
+                "status": "healthy" if groq_available else "unavailable",
+                "provider": "groq"
+            }
+        },
+        "version": "2.0.0",
+        "timestamp": datetime.utcnow().isoformat() + 'Z'
     }
 
 

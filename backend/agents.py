@@ -4,26 +4,16 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
 import os
 import json
-import logging
 import time
 from typing import Dict, List, Optional, Tuple
 from models import OptimizationGoalEnum, CategoryEnum
 from groq import RateLimitError
 
-# Configure logging
-log_dir = os.path.join(os.path.dirname(__file__), 'logs')
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, 'agent.log')
+# Import observability components
+from logging_config import get_ai_logger
+from metrics import track_ai_request, track_recommendation
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+logger = get_ai_logger()
 
 
 class RateLimitHandler:
@@ -124,14 +114,24 @@ class AgenticRecommendationSystem:
                     temperature=0.7,
                     max_tokens=1000
                 )
-                print("✓ Groq AI initialized successfully")
+                logger.info("Groq AI initialized successfully", extra={
+                    'event': 'ai_init',
+                    'model': 'llama-3.3-70b-versatile',
+                    'status': 'success'
+                })
             except Exception as e:
-                print(f"❌ ERROR: Could not initialize Groq AI: {e}")
-                print("  Service will not be available until this is resolved")
+                logger.error("Could not initialize Groq AI", extra={
+                    'event': 'ai_init',
+                    'status': 'failed',
+                    'error': str(e)
+                })
                 self.llm = None
         else:
-            print("❌ ERROR: GROQ_API_KEY not found in environment")
-            print("  Service will not be available until API key is configured")
+            logger.error("GROQ_API_KEY not found in environment", extra={
+                'event': 'ai_init',
+                'status': 'failed',
+                'error': 'missing_api_key'
+            })
         
         # Only create prompt and chain if LLM is available
         self.recommendation_prompt = None
@@ -280,7 +280,14 @@ Card: {card['card_name']} ({card['issuer']})
             Dict with recommendation details
         """
         # Input validation
-        logger.info(f"Processing recommendation request: {transaction_data.get('merchant', 'Unknown')} - ${transaction_data.get('amount', 0)}")
+        start_time = time.time()
+        logger.info("Processing recommendation request", extra={
+            'event': 'recommendation_start',
+            'merchant': transaction_data.get('merchant', 'Unknown'),
+            'amount': transaction_data.get('amount', 0),
+            'category': transaction_data.get('category', 'unknown'),
+            'goal': transaction_data.get('optimization_goal', 'balanced')
+        })
         
         # Validate user has cards
         if not user_cards or len(user_cards) == 0:
@@ -391,8 +398,23 @@ Rank #{i}: {card['card_name']} ({card['issuer']})
             ai_explanation
         )
         
-        logger.info(f"Recommendation complete: {best_card['card_name']} - ${best_card_data['value']:.2f}")
-        
+        # Track metrics
+        duration = time.time() - start_time
+        track_ai_request(
+            model='llama-3.3-70b-versatile',
+            operation='recommendation',
+            duration=duration,
+            success=True
+        )
+        track_recommendation(success=True, savings=best_card_data['value'])
+
+        logger.info("Recommendation complete", extra={
+            'event': 'recommendation_complete',
+            'card_name': best_card['card_name'],
+            'expected_value': round(best_card_data['value'], 2),
+            'duration_ms': round(duration * 1000, 2)
+        })
+
         # Build final response
         return {
             "recommended_card": {
