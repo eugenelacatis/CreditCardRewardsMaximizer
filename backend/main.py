@@ -596,8 +596,9 @@ async def get_card_recommendation(
                 cash_back_earned = float(card_dict.get("cash_back_earned", 0) or 0)
 
                 if points_earned > 0:
-                    # Show actual points earned for this transaction
-                    estimated_value = f"{points_earned:.0f} points"
+                    # Convert points to dollar value (1 point = $0.01 typical valuation)
+                    dollar_value = points_earned * 0.01
+                    estimated_value = f"${dollar_value:.2f}"
                 elif cash_back_earned > 0:
                     # Show actual cash back earned for this transaction
                     estimated_value = f"${cash_back_earned:.2f}"

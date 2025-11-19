@@ -34,6 +34,7 @@ export default function TransactionScreen() {
   const [showResult, setShowResult] = useState(false);
   const [recommendation, setRecommendation] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [savingTransaction, setSavingTransaction] = useState(false);
   const isFocused = useIsFocused();
 
   useEffect(() => {
@@ -115,6 +116,54 @@ export default function TransactionScreen() {
     }
   };
 
+  const handleAddToTransactions = async () => {
+    if (!recommendation || !userId) return;
+
+    setSavingTransaction(true);
+
+    try {
+      const card = recommendation.recommended_card;
+
+      // Parse the estimated value to get the numeric amount
+      const estimatedValue = card.estimated_value || '$0.00';
+      const valueAmount = parseFloat(estimatedValue.replace('$', '')) || 0;
+
+      const transactionData = {
+        user_id: userId,
+        merchant: merchant.trim(),
+        amount: parseFloat(amount),
+        category: selectedCategory,
+        card_used_id: card.card_id,
+        recommended_card_id: card.card_id,
+        total_value_earned: valueAmount,
+        optimal_value: valueAmount,
+        recommendation_explanation: card.reason || '',
+      };
+
+      await API.createTransaction(transactionData);
+
+      Alert.alert(
+        'Transaction Added',
+        `Successfully added ${merchant} transaction for $${amount} using ${card.card_name}`,
+        [{ text: 'OK' }]
+      );
+
+      setShowResult(false);
+      setMerchant('');
+      setAmount('');
+      setRecommendation(null);
+
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+      Alert.alert(
+        'Error',
+        'Failed to save transaction. Please try again.\n\nError: ' + error.message
+      );
+    } finally {
+      setSavingTransaction(false);
+    }
+  };
+
   const CategoryButton = ({ category }) => {
     const isSelected = selectedCategory === category.id;
     return (
@@ -178,16 +227,31 @@ export default function TransactionScreen() {
                 </View>
               )}
 
-              {/* Action Button */}
+              {/* Action Buttons */}
               <TouchableOpacity
-                style={styles.doneButton}
+                style={[styles.addTransactionButton, savingTransaction && styles.submitButtonDisabled]}
+                onPress={handleAddToTransactions}
+                disabled={savingTransaction}
+              >
+                {savingTransaction ? (
+                  <>
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text style={styles.addTransactionButtonText}>  Saving...</Text>
+                  </>
+                ) : (
+                  <Text style={styles.addTransactionButtonText}>Add to Transactions</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.closeModalButton}
                 onPress={() => {
                   setShowResult(false);
                   setMerchant('');
                   setAmount('');
                 }}
               >
-                <Text style={styles.doneButtonText}>Got It!</Text>
+                <Text style={styles.closeModalButtonText}>Close</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -513,5 +577,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  addTransactionButton: {
+    backgroundColor: '#4CAF50',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  addTransactionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  closeModalButton: {
+    backgroundColor: '#E0E0E0',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  closeModalButtonText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
