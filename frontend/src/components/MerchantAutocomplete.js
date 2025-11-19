@@ -9,9 +9,24 @@ import {
   Keyboard,
   ScrollView,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 
 const DEFAULT_RESULT_LIMIT = 100;
 
+/**
+ * MerchantAutocomplete component - Version before "tap outside" improvements
+ * This version includes:
+ * - Improved search with DEFAULT_RESULT_LIMIT
+ * - Unified fetchMerchants function
+ * - Shows all merchants on tap
+ * - Filters as you type
+ * - Closes on Enter or selection
+ * 
+ * Saved before adding:
+ * - Keyboard listener for tap outside detection
+ * - Improved blur handling with reduced delay
+ * - Input ref for programmatic control
+ */
 export default function MerchantAutocomplete({
   value,
   onMerchantSelect,
@@ -24,10 +39,21 @@ export default function MerchantAutocomplete({
   const [showResults, setShowResults] = useState(false);
   const [isSelectingMerchant, setIsSelectingMerchant] = useState(false);
   const debounceTimer = useRef(null);
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     setQuery(value || '');
   }, [value]);
+
+  // Close dropdown and clear input when navigating away from the screen
+  useEffect(() => {
+    if (!isFocused) {
+      setShowResults(false);
+      setResults([]);
+      setQuery('');
+      Keyboard.dismiss();
+    }
+  }, [isFocused]);
 
   const fetchMerchants = async (searchQuery = '') => {
     if (isSelectingMerchant) return;
@@ -135,6 +161,12 @@ export default function MerchantAutocomplete({
     }, 150);
   };
 
+  const handleCloseDropdown = () => {
+    setShowResults(false);
+    setResults([]);
+    Keyboard.dismiss();
+  };
+
   const getCategoryEmoji = (category) => {
     const emojiMap = {
       dining: '🍽️',
@@ -142,7 +174,7 @@ export default function MerchantAutocomplete({
       groceries: '🛒',
       gas: '⛽',
       entertainment: '🎬',
-      shopping: '�️',
+      shopping: '🛍️',
       other: '📦',
     };
     return emojiMap[category] || '📦';
@@ -177,6 +209,18 @@ export default function MerchantAutocomplete({
       {/* Results Dropdown - Show when focused */}
       {shouldShowResults && (
         <View style={styles.resultsContainer}>
+          {/* Header with close button */}
+          <View style={styles.dropdownHeader}>
+            <Text style={styles.dropdownHeaderText}>Select a merchant</Text>
+            <TouchableOpacity
+              onPress={handleCloseDropdown}
+              style={styles.closeButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#4A90E2" />
@@ -262,6 +306,38 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     zIndex: 1001,
+    overflow: 'hidden',
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#F9F9F9',
+  },
+  dropdownHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  closeButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'bold',
+    lineHeight: 16,
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -337,3 +413,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+

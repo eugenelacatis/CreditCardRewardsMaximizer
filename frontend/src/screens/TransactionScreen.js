@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useIsFocused } from '@react-navigation/native';
 import { API } from '../services/api';
 import MerchantAutocomplete from '../components/MerchantAutocomplete';
 
@@ -40,6 +41,7 @@ export default function TransactionScreen() {
   const [showResult, setShowResult] = useState(false);
   const [recommendation, setRecommendation] = useState(null);
   const [userId, setUserId] = useState(null);
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     // Load user ID from AsyncStorage
@@ -49,6 +51,14 @@ export default function TransactionScreen() {
     };
     loadUserId();
   }, []);
+
+  // Clear merchant and amount inputs when navigating away from the screen
+  useEffect(() => {
+    if (!isFocused) {
+      setMerchant('');
+      setAmount('');
+    }
+  }, [isFocused]);
 
   const handleGetRecommendation = async () => {
     // Validation
