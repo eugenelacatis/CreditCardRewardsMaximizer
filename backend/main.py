@@ -588,7 +588,7 @@ async def get_card_recommendation(
 
 @app.get("/api/v1/merchants/search")
 async def search_merchants(
-    q: str,
+    q: str = "",
     limit: int = 10,
     db: Session = Depends(get_db)
 ):
@@ -596,7 +596,7 @@ async def search_merchants(
     Search merchants by name with autocomplete
     
     Args:
-        q: Search query (minimum 1 character)
+        q: Search query (empty string returns all merchants)
         limit: Maximum number of results (default: 10)
         
     Returns:
@@ -604,17 +604,21 @@ async def search_merchants(
         
     Example:
         GET /api/v1/merchants/search?q=star&limit=5
+        GET /api/v1/merchants/search?q=&limit=50  (all merchants)
     """
     try:
         from models import Merchant
         
-        if len(q) < 1:
-            return []
-        
-        # Search merchants by name (case-insensitive)
-        merchants = db.query(Merchant).filter(
-            Merchant.merchant_name.ilike(f"%{q}%")
-        ).order_by(Merchant.merchant_name).limit(limit).all()
+        # If query is empty, return all merchants (up to limit)
+        if not q or len(q) == 0:
+            merchants = db.query(Merchant).order_by(
+                Merchant.merchant_name
+            ).limit(limit).all()
+        else:
+            # Search merchants by name (case-insensitive)
+            merchants = db.query(Merchant).filter(
+                Merchant.merchant_name.ilike(f"%{q}%")
+            ).order_by(Merchant.merchant_name).limit(limit).all()
         
         return [
             {

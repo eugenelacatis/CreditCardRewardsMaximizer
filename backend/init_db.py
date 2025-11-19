@@ -7,6 +7,7 @@ from database import db
 from crud import create_user, create_credit_cards_from_library
 from models import Base, OptimizationGoalEnum
 from auth import hash_password
+from scripts.seed_merchants import seed_merchants
 
 
 def init_and_seed_database():
@@ -47,6 +48,14 @@ def init_and_seed_database():
         library_cards = create_credit_cards_from_library(session, user.user_id)
 
         session.commit()
+
+        # Seed merchants from merchants.json
+        print(f"\n🏪 Seeding merchants from merchants.json...")
+        try:
+            seed_merchants()
+        except Exception as e:
+            print(f"⚠️  Warning: Could not seed merchants: {e}")
+            print("   This is okay if merchants are already seeded or file is missing.")
 
         print("\n" + "="*60)
         print("✨ DATABASE READY!")
