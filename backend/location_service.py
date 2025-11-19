@@ -172,53 +172,77 @@ class LocationService:
         Returns:
             List of nearby places with details
         """
+        # List of Overpass API endpoints to try (with fallbacks)
+        overpass_endpoints = [
+            "https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+        ]
+
+        # Build Overpass QL query for places relevant to credit card rewards
+        # Query for amenities: restaurants, cafes, fuel stations, etc.
+        query = f"""
+        [out:json][timeout:15];
+        (
+          // Dining
+          node["amenity"="restaurant"](around:{radius},{latitude},{longitude});
+          node["amenity"="cafe"](around:{radius},{latitude},{longitude});
+          node["amenity"="fast_food"](around:{radius},{latitude},{longitude});
+          node["amenity"="bar"](around:{radius},{latitude},{longitude});
+
+          // Groceries
+          node["shop"="supermarket"](around:{radius},{latitude},{longitude});
+          node["shop"="grocery"](around:{radius},{latitude},{longitude});
+          node["shop"="convenience"](around:{radius},{latitude},{longitude});
+
+          // Gas stations
+          node["amenity"="fuel"](around:{radius},{latitude},{longitude});
+
+          // Shopping
+          node["shop"="mall"](around:{radius},{latitude},{longitude});
+          node["shop"="department_store"](around:{radius},{latitude},{longitude});
+          node["shop"="clothes"](around:{radius},{latitude},{longitude});
+          node["shop"="electronics"](around:{radius},{latitude},{longitude});
+
+          // Entertainment
+          node["amenity"="cinema"](around:{radius},{latitude},{longitude});
+          node["leisure"="bowling_alley"](around:{radius},{latitude},{longitude});
+
+          // Travel
+          node["tourism"="hotel"](around:{radius},{latitude},{longitude});
+          node["aeroway"="aerodrome"](around:{radius},{latitude},{longitude});
+        );
+        out body;
+        """
+
+        # Try each endpoint until one works
+        for url in overpass_endpoints:
+            try:
+                logger.info(f"Trying Overpass API endpoint: {url}")
+                response = requests.post(url, data={"data": query}, timeout=20)
+
+                if response.status_code == 200:
+                    results = response.json()
+                    break
+                elif response.status_code in [429, 504, 503]:
+                    logger.warning(f"OSM Overpass API at {url} returned {response.status_code}, trying next endpoint...")
+                    continue
+                else:
+                    logger.error(f"OSM Overpass API error at {url}: {response.status_code}")
+                    continue
+
+            except requests.exceptions.Timeout:
+                logger.warning(f"Timeout connecting to {url}, trying next endpoint...")
+                continue
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Request error for {url}: {e}, trying next endpoint...")
+                continue
+        else:
+            # All endpoints failed
+            logger.error("All Overpass API endpoints failed, falling back to mock data")
+            return self._get_mock_nearby_places(latitude, longitude)
+
         try:
-            # Overpass API endpoint
-            url = "https://overpass-api.de/api/interpreter"
-
-            # Build Overpass QL query for places relevant to credit card rewards
-            # Query for amenities: restaurants, cafes, fuel stations, etc.
-            query = f"""
-            [out:json][timeout:25];
-            (
-              // Dining
-              node["amenity"="restaurant"](around:{radius},{latitude},{longitude});
-              node["amenity"="cafe"](around:{radius},{latitude},{longitude});
-              node["amenity"="fast_food"](around:{radius},{latitude},{longitude});
-              node["amenity"="bar"](around:{radius},{latitude},{longitude});
-
-              // Groceries
-              node["shop"="supermarket"](around:{radius},{latitude},{longitude});
-              node["shop"="grocery"](around:{radius},{latitude},{longitude});
-              node["shop"="convenience"](around:{radius},{latitude},{longitude});
-
-              // Gas stations
-              node["amenity"="fuel"](around:{radius},{latitude},{longitude});
-
-              // Shopping
-              node["shop"="mall"](around:{radius},{latitude},{longitude});
-              node["shop"="department_store"](around:{radius},{latitude},{longitude});
-              node["shop"="clothes"](around:{radius},{latitude},{longitude});
-              node["shop"="electronics"](around:{radius},{latitude},{longitude});
-
-              // Entertainment
-              node["amenity"="cinema"](around:{radius},{latitude},{longitude});
-              node["leisure"="bowling_alley"](around:{radius},{latitude},{longitude});
-
-              // Travel
-              node["tourism"="hotel"](around:{radius},{latitude},{longitude});
-              node["aeroway"="aerodrome"](around:{radius},{latitude},{longitude});
-            );
-            out body;
-            """
-
-            response = requests.post(url, data={"data": query}, timeout=30)
-
-            if response.status_code != 200:
-                logger.error(f"OSM Overpass API error: {response.status_code}")
-                return self._get_mock_nearby_places(latitude, longitude)
-
-            results = response.json()
             all_places = []
 
             for element in results.get('elements', []):

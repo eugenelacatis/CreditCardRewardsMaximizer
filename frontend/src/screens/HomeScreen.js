@@ -398,23 +398,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
-        {!loading && stats.total_transactions > 0 && (
-          <View style={styles.insightCard}>
-            <Text style={styles.insightTitle}>📊 Your Performance</Text>
-            <Text style={styles.insightText}>
-              Total Spent: ${stats.total_spent.toFixed(2)}
-            </Text>
-            <Text style={styles.insightText}>
-              Optimization Rate: {(stats.optimization_rate * 100).toFixed(1)}%
-            </Text>
-            {stats.missed_value > 0 && (
-              <Text style={[styles.insightText, { color: '#FF9800' }]}>
-                Potential Savings: ${stats.missed_value.toFixed(2)}
-              </Text>
-            )}
-          </View>
-        )}
-
         {/* Location-based recommendations */}
         {loadingLocation && (
           <View style={styles.locationLoadingCard}>
@@ -441,6 +424,18 @@ export default function HomeScreen({ navigation }) {
             onRefresh={requestLocationPermissionAndFetchRecommendations}
             onRecommendationPress={handleRecommendationPress}
           />
+        )}
+
+        {!loading && stats.total_transactions > 0 && (
+          <View style={styles.insightCard}>
+            <Text style={styles.insightTitle}>📊 Your Performance</Text>
+            <Text style={styles.insightText}>
+              Total Spent: ${stats.total_spent.toFixed(2)}
+            </Text>
+            <Text style={styles.insightText}>
+              Optimization Rate: {stats.optimization_rate.toFixed(0)}%
+            </Text>
+          </View>
         )}
       </ScrollView>
 

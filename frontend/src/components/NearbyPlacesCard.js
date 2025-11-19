@@ -75,9 +75,6 @@ const NearbyPlacesCard = ({ recommendations, onRefresh, onRecommendationPress })
                 </Text>
                 <Text style={styles.rewardLabel}> estimated rewards</Text>
               </View>
-              <Text style={styles.explanation} numberOfLines={2}>
-                {rec.recommended_card.explanation}
-              </Text>
             </View>
 
             <View style={styles.tapHint}>
@@ -215,11 +212,6 @@ const styles = StyleSheet.create({
   rewardLabel: {
     fontSize: 13,
     color: '#666',
-  },
-  explanation: {
-    fontSize: 12,
-    color: '#666',
-    lineHeight: 16,
   },
   tapHint: {
     marginTop: 10,
