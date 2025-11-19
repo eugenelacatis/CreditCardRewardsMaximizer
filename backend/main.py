@@ -635,6 +635,119 @@ async def get_card_recommendation(
         )
 
 
+@app.get("/api/v1/merchants/search")
+async def search_merchants(
+    q: str,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """
+    Search merchants by name with autocomplete
+    
+    Args:
+        q: Search query (minimum 1 character)
+        limit: Maximum number of results (default: 10)
+        
+    Returns:
+        List of merchants with name, category, and logo
+        
+    Example:
+        GET /api/v1/merchants/search?q=star&limit=5
+    """
+    try:
+        from models import Merchant
+        
+        if len(q) < 1:
+            return []
+        
+        # Search merchants by name (case-insensitive)
+        merchants = db.query(Merchant).filter(
+            Merchant.merchant_name.ilike(f"%{q}%")
+        ).order_by(Merchant.merchant_name).limit(limit).all()
+        
+        return [
+            {
+                "merchant_id": m.merchant_id,
+                "merchant_name": m.merchant_name,
+                "primary_category": m.primary_category.value,
+                "logo_url": m.logo_url
+            }
+            for m in merchants
+        ]
+        
+    except Exception as e:
+        logger.error(f"Error searching merchants: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error searching merchants: {str(e)}"
+        )
+
+
+@app.post("/api/v1/merchants", status_code=201)
+async def create_merchant(
+    merchant_name: str,
+    primary_category: Category,
+    logo_url: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new merchant (for merchants not in the library)
+    
+    Args:
+        merchant_name: Name of the merchant
+        primary_category: Primary category enum value
+        logo_url: Optional logo URL
+    """
+    try:
+        from models import Merchant, CategoryEnum
+        
+        # Check if merchant already exists
+        existing = db.query(Merchant).filter(
+            Merchant.merchant_name.ilike(merchant_name)
+        ).first()
+        
+        if existing:
+            return {
+                "merchant_id": existing.merchant_id,
+                "merchant_name": existing.merchant_name,
+                "primary_category": existing.primary_category.value,
+                "logo_url": existing.logo_url,
+                "message": "Merchant already exists"
+            }
+        
+        # Convert Category enum to CategoryEnum
+        category_enum = CategoryEnum(primary_category.value)
+        
+        # Create new merchant
+        new_merchant = Merchant(
+            merchant_name=merchant_name,
+            primary_category=category_enum,
+            logo_url=logo_url,
+            secondary_categories=[],
+            has_special_offers=False
+        )
+        
+        db.add(new_merchant)
+        db.commit()
+        db.refresh(new_merchant)
+        
+        return {
+            "merchant_id": new_merchant.merchant_id,
+            "merchant_name": new_merchant.merchant_name,
+            "primary_category": new_merchant.primary_category.value,
+            "logo_url": new_merchant.logo_url,
+            "message": "Merchant created successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating merchant: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error creating merchant: {str(e)}"
+        )
+
+
 @app.get("/api/v1/users/{user_id}/cards", response_model=List[CreditCard])
 async def get_user_credit_cards(user_id: str, db: Session = Depends(get_db)):
     """Get all active credit cards for a user"""

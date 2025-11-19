@@ -803,6 +803,74 @@ def get_or_create_merchant(
     return merchant
 
 
+def search_merchants_by_name(
+    db: Session,
+    query: str,
+    limit: int = 10
+) -> List[Merchant]:
+    """
+    Search merchants by name (case-insensitive, partial match)
+    
+    Args:
+        db: Database session
+        query: Search query string
+        limit: Maximum number of results
+        
+    Returns:
+        List of matching merchants
+        
+    Example:
+        merchants = search_merchants_by_name(db, "star", limit=5)
+        # Returns: [Merchant(name="Starbucks", ...)]
+    """
+    if not query or len(query) < 1:
+        return []
+    
+    return db.query(Merchant).filter(
+        Merchant.merchant_name.ilike(f"%{query}%")
+    ).order_by(Merchant.merchant_name).limit(limit).all()
+
+
+def get_all_merchants(
+    db: Session,
+    limit: int = 100
+) -> List[Merchant]:
+    """
+    Get all merchants (for browsing)
+    
+    Args:
+        db: Database session
+        limit: Maximum number of results
+        
+    Returns:
+        List of merchants ordered by name
+    """
+    return db.query(Merchant).order_by(
+        Merchant.merchant_name
+    ).limit(limit).all()
+
+
+def get_merchants_by_category(
+    db: Session,
+    category: CategoryEnum,
+    limit: int = 50
+) -> List[Merchant]:
+    """
+    Get merchants by category
+    
+    Args:
+        db: Database session
+        category: Category enum value
+        limit: Maximum number of results
+        
+    Returns:
+        List of merchants in the specified category
+    """
+    return db.query(Merchant).filter(
+        Merchant.primary_category == category
+    ).order_by(Merchant.merchant_name).limit(limit).all()
+
+
 # ============================================================================
 # OFFER OPERATIONS
 # ============================================================================

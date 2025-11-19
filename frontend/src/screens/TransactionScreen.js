@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useIsFocused } from '@react-navigation/native';
 import { API } from '../services/api';
+import MerchantAutocomplete from '../components/MerchantAutocomplete';
 
 const CATEGORIES = [
   { id: 'dining', label: 'Dining', emoji: '🍽️' },
@@ -39,6 +41,7 @@ export default function TransactionScreen() {
   const [showResult, setShowResult] = useState(false);
   const [recommendation, setRecommendation] = useState(null);
   const [userId, setUserId] = useState(null);
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     // Load user ID from AsyncStorage
@@ -48,6 +51,14 @@ export default function TransactionScreen() {
     };
     loadUserId();
   }, []);
+
+  // Clear merchant and amount inputs when navigating away from the screen
+  useEffect(() => {
+    if (!isFocused) {
+      setMerchant('');
+      setAmount('');
+    }
+  }, [isFocused]);
 
   const handleGetRecommendation = async () => {
     // Validation
@@ -201,15 +212,17 @@ export default function TransactionScreen() {
 
         {/* Form */}
         <View style={styles.form}>
-          {/* Merchant Input */}
+          {/* Merchant Input with Autocomplete */}
           <Text style={styles.label}>Where are you shopping?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., Starbucks, Amazon, Whole Foods"
+          <MerchantAutocomplete
             value={merchant}
-            onChangeText={setMerchant}
-            placeholderTextColor="#999"
+            onMerchantSelect={(merchantName) => setMerchant(merchantName)}
+            onCategorySelect={(categoryId) => setSelectedCategory(categoryId)}
+            apiUrl="http://localhost:8000" // Change for production
           />
+          <Text style={styles.hint}>
+            Start typing to search merchants
+          </Text>
 
           {/* Amount Input */}
           <Text style={styles.label}>How much?</Text>
@@ -293,6 +306,12 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 20,
     marginBottom: 10,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   input: {
     backgroundColor: '#fff',
