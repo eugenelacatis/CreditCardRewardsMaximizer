@@ -393,6 +393,7 @@ export default function CardsScreen() {
               renderItem={({ item }) => <LibraryCardItem card={item} />}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.libraryList}
+              style={styles.libraryFlatList}
             />
           </View>
         </View>
@@ -525,6 +526,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 20,
     maxHeight: '90%',
+    flex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -556,6 +558,7 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     marginBottom: 16,
+    maxHeight: 40,
   },
   filterButton: {
     backgroundColor: '#F5F7FA',
@@ -580,6 +583,9 @@ const styles = StyleSheet.create({
   },
   libraryList: {
     paddingBottom: 20,
+  },
+  libraryFlatList: {
+    flex: 1,
   },
 
   helpBox: {
