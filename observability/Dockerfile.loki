@@ -1,0 +1,13 @@
+FROM grafana/loki:2.9.0
+
+# Copy Loki configuration
+COPY loki/loki-config.yml /etc/loki/local-config.yaml
+
+# Expose Loki port
+EXPOSE 3100
+
+# Run as root to avoid permission issues
+USER root
+
+# Start Loki with the config file
+CMD ["-config.file=/etc/loki/local-config.yaml"]
