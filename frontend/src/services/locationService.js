@@ -21,6 +21,14 @@ export class LocationService {
   }
 
   /**
+   * Clear the permission request flag (allows re-prompting)
+   * Useful for testing or if user wants to be asked again
+   */
+  static async clearPermissionRequested() {
+    await AsyncStorage.removeItem(LOCATION_PERMISSION_KEY);
+  }
+
+  /**
    * Request location permissions from the user
    * Returns: { granted: boolean, status: string }
    */

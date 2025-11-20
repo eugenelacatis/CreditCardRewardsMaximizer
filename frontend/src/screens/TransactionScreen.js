@@ -121,70 +121,60 @@ export default function TransactionScreen() {
   const handleAddToTransactions = async () => {
     if (!recommendation || !userId || !selectedCard) return;
 
+    // Prevent multiple calls
+    if (savingTransaction) return;
+
     setSavingTransaction(true);
 
-    try {
-      const card = selectedCard;
-      const optimalCard = recommendation.recommended_card;
+    const card = selectedCard;
+    const optimalCard = recommendation.recommended_card;
 
-      // Parse the estimated values
-      const estimatedValue = card.estimated_value || '$0.00';
-      const valueAmount = parseFloat(estimatedValue.replace('$', '')) || 0;
+    // Parse the estimated values
+    const estimatedValue = card.estimated_value || '$0.00';
+    const valueAmount = parseFloat(estimatedValue.replace('$', '')) || 0;
 
-      const optimalValue = optimalCard.estimated_value || '$0.00';
-      const optimalAmount = parseFloat(optimalValue.replace('$', '')) || 0;
+    const optimalValue = optimalCard.estimated_value || '$0.00';
+    const optimalAmount = parseFloat(optimalValue.replace('$', '')) || 0;
 
-      const transactionData = {
-        user_id: userId,
-        merchant: merchant.trim(),
-        amount: parseFloat(amount),
-        category: selectedCategory,
-        card_used_id: card.card_id,
-        recommended_card_id: optimalCard.card_id,
-        total_value_earned: valueAmount,
-        optimal_value: optimalAmount,
-        recommendation_explanation: card.reason || '',
-      };
+    const transactionData = {
+      user_id: userId,
+      merchant: merchant.trim(),
+      amount: parseFloat(amount),
+      category: selectedCategory,
+      card_used_id: card.card_id,
+      recommended_card_id: optimalCard.card_id,
+      total_value_earned: valueAmount,
+      optimal_value: optimalAmount,
+      recommendation_explanation: card.reason || '',
+    };
 
-      await API.createTransaction(transactionData);
-
-      // Close modal first, then show alert
-      const merchantName = merchant;
-      const amountValue = amount;
-      const cardName = card.card_name;
-
-      setShowResult(false);
-      setMerchant('');
-      setAmount('');
-      setRecommendation(null);
-      setSelectedCard(null);
-
-      // Show alert after modal is closed
-      setTimeout(() => {
-        Alert.alert(
-          'Transaction Added',
-          `Successfully added ${merchantName} transaction for $${amountValue} using ${cardName}`,
-          [{ text: 'OK' }]
-        );
-      }, 300);
-
-    } catch (error) {
-      console.error('Error saving transaction:', error);
-
-      // Close modal first, then show error
-      setShowResult(false);
-      setSavingTransaction(false);
-
-      setTimeout(() => {
-        Alert.alert(
-          'Error',
-          'Failed to save transaction. Please try again.\n\nError: ' + error.message
-        );
-      }, 300);
-      return;
-    }
-
+    // Close modal FIRST before API call to prevent UI blocking
+    setShowResult(false);
+    
+    // Clear loading state immediately so UI is responsive
     setSavingTransaction(false);
+
+    // Clear form immediately (optimistic update)
+    setMerchant('');
+    setAmount('');
+    setRecommendation(null);
+    setSelectedCard(null);
+
+    // Make API call in background (non-blocking)
+    API.createTransaction(transactionData)
+      .then(() => {
+        console.log('Transaction saved successfully');
+      })
+      .catch((error) => {
+        console.error('Transaction save error:', error);
+        // Show error but don't block UI
+        setTimeout(() => {
+          Alert.alert(
+            'Error',
+            'Transaction may not have been saved. Please check your history.\n\nError: ' + (error.message || 'Unknown error')
+          );
+        }, 500);
+      });
   };
 
   const CategoryButton = ({ category }) => {

@@ -4,7 +4,7 @@ import axios from 'axios';
 // Configuration
 // Use your Mac's local IP address for physical device/iOS simulator testing
 // For web browser testing, use localhost
-const API_BASE_URL = 'http://10.0.0.222:8000/api/v1';  // Mac local IP
+const API_BASE_URL = 'https://creditcardrewardsmaximizer-production.up.railway.app/api/v1';  // Mac local IP
 // const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';  // For web browser only
 // const API_BASE_URL = 'http://192.168.1.98:8000/api/v1';
 // const API_BASE_URL = 'https://chubby-rats-listen.loca.lt/api/v1'
@@ -205,24 +205,6 @@ export const API = {
   // User Profile methods
   getUserProfile: async (userId) => {
     return await apiClient.get(`/users/${userId}/profile`);
-  },
-
-  updateUserProfile: async (userId, profileData) => {
-    console.log('');
-    console.log('===============================');
-    console.log('API.updateUserProfile called');
-    console.log('===============================');
-    console.log('User ID:', userId);
-    console.log('Profile Data:', JSON.stringify(profileData, null, 2));
-
-    try {
-      const response = await apiClient.put(`/users/${userId}/profile`, profileData);
-      console.log('Profile updated:', response.data);
-      return response;
-    } catch (error) {
-      console.error('Error updating profile:', error.message);
-      throw error;
-    }
   },
 
   // Location-based methods
