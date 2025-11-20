@@ -121,12 +121,16 @@ export default function TransactionScreen() {
   const handleAddToTransactions = async () => {
     if (!recommendation || !userId || !selectedCard) return;
 
+    // Capture values before any state changes
+    const card = selectedCard;
+    const optimalCard = recommendation.recommended_card;
+    const merchantName = merchant.trim();
+    const amountValue = parseFloat(amount);
+    const cardName = card.card_name;
+
     setSavingTransaction(true);
 
     try {
-      const card = selectedCard;
-      const optimalCard = recommendation.recommended_card;
-
       // Parse the estimated values
       const estimatedValue = card.estimated_value || '$0.00';
       const valueAmount = parseFloat(estimatedValue.replace('$', '')) || 0;
@@ -136,8 +140,8 @@ export default function TransactionScreen() {
 
       const transactionData = {
         user_id: userId,
-        merchant: merchant.trim(),
-        amount: parseFloat(amount),
+        merchant: merchantName,
+        amount: amountValue,
         category: selectedCategory,
         card_used_id: card.card_id,
         recommended_card_id: optimalCard.card_id,
@@ -148,12 +152,7 @@ export default function TransactionScreen() {
 
       await API.createTransaction(transactionData);
 
-      // Close modal first, then show alert
-      const merchantName = merchant;
-      const amountValue = amount;
-      const cardName = card.card_name;
-
-      // Reset saving state before closing modal
+      // Reset all states
       setSavingTransaction(false);
       setShowResult(false);
       setMerchant('');
@@ -162,27 +161,23 @@ export default function TransactionScreen() {
       setSelectedCard(null);
 
       // Show alert after modal is closed
-      setTimeout(() => {
-        Alert.alert(
-          'Transaction Added',
-          `Successfully added ${merchantName} transaction for $${amountValue} using ${cardName}`,
-          [{ text: 'OK' }]
-        );
-      }, 300);
+      Alert.alert(
+        'Transaction Added',
+        `Successfully added ${merchantName} transaction for $${amountValue.toFixed(2)} using ${cardName}`,
+        [{ text: 'OK' }]
+      );
 
     } catch (error) {
       console.error('Error saving transaction:', error);
 
-      // Reset saving state and close modal first, then show error
+      // Reset saving state and close modal
       setSavingTransaction(false);
       setShowResult(false);
 
-      setTimeout(() => {
-        Alert.alert(
-          'Error',
-          'Failed to save transaction. Please try again.\n\nError: ' + error.message
-        );
-      }, 300);
+      Alert.alert(
+        'Error',
+        'Failed to save transaction. Please try again.\n\nError: ' + error.message
+      );
     }
   };
 
