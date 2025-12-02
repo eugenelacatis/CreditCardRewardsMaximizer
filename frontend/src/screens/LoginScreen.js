@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,20 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  ScrollView
+  ScrollView,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
+import { colors, spacing, borderRadius, shadows } from '../theme';
 
-// The 'onLogin' and 'onBack' props are passed down from App.js
+const { width } = Dimensions.get('window');
+
 export default function LoginScreen({ onLogin, onBack }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,6 +30,27 @@ export default function LoginScreen({ onLogin, onBack }) {
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [optimizationGoal, setOptimizationGoal] = useState('balanced');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleLoginPress = async () => {
     if (!email || !password) {
@@ -35,19 +62,14 @@ export default function LoginScreen({ onLogin, onBack }) {
     try {
       const response = await API.signin({
         email: email.trim(),
-        password: password
+        password: password,
       });
 
-      // Store user data
       await AsyncStorage.setItem('userId', response.data.user_id);
       await AsyncStorage.setItem('userEmail', response.data.email);
       await AsyncStorage.setItem('userFullName', response.data.full_name);
 
-      console.log('✅ Login successful, user ID:', response.data.user_id);
-
-      // Call onLogin with user data
       onLogin(response.data.user_id);
-
     } catch (error) {
       console.error('Login error:', error);
       Alert.alert(
@@ -76,27 +98,19 @@ export default function LoginScreen({ onLogin, onBack }) {
         email: email.trim(),
         password: password,
         full_name: fullName.trim(),
-        optimization_goal: optimizationGoal
+        optimization_goal: optimizationGoal,
       });
 
-      // Store user data
       await AsyncStorage.setItem('userId', response.data.user_id);
       await AsyncStorage.setItem('userEmail', response.data.email);
       await AsyncStorage.setItem('userFullName', response.data.full_name);
 
-      console.log('✅ Signup successful, user ID:', response.data.user_id);
-
-      Alert.alert(
-        'Success',
-        'Account created successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => onLogin(response.data.user_id)
-          }
-        ]
-      );
-
+      Alert.alert('Success', 'Account created successfully!', [
+        {
+          text: 'OK',
+          onPress: () => onLogin(response.data.user_id),
+        },
+      ]);
     } catch (error) {
       console.error('Signup error:', error);
       Alert.alert(
@@ -115,264 +129,422 @@ export default function LoginScreen({ onLogin, onBack }) {
   };
 
   const optimizationGoals = [
-    { value: 'cash_back', label: 'Cash Back', icon: 'cash-multiple', description: 'Maximize cash back rewards' },
-    { value: 'travel_points', label: 'Travel Points', icon: 'airplane', description: 'Maximize travel points & miles' },
-    { value: 'specific_discounts', label: 'Specific Discounts', icon: 'sale', description: 'Focus on category discounts' },
-    { value: 'balanced', label: 'Balanced', icon: 'scale-balance', description: 'Best overall value' },
+    {
+      value: 'cash_back',
+      label: 'Cash Back',
+      icon: 'cash-multiple',
+      gradient: colors.success.gradient,
+    },
+    {
+      value: 'travel_points',
+      label: 'Travel',
+      icon: 'airplane',
+      gradient: colors.primary.gradient,
+    },
+    {
+      value: 'specific_discounts',
+      label: 'Discounts',
+      icon: 'sale',
+      gradient: colors.warning.gradient,
+    },
+    {
+      value: 'balanced',
+      label: 'Balanced',
+      icon: 'scale-balance',
+      gradient: colors.secondary.gradient,
+    },
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <View style={styles.container}>
+      <LinearGradient
+        colors={colors.primary.gradient}
+        style={StyleSheet.absoluteFillObject}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.content}
         >
-          {onBack && (
-            <TouchableOpacity style={styles.backButton} onPress={onBack} disabled={loading}>
-              <Icon name="arrow-left" size={24} color="#4A90E2" />
-              <Text style={styles.backButtonText}>Back</Text>
-            </TouchableOpacity>
-          )}
-          <View style={styles.header}>
-            <Icon name="wallet" size={60} color="#4A90E2" />
-            <Text style={styles.title}>Agentic Wallet</Text>
-            <Text style={styles.subtitle}>
-              {isSignupMode ? 'Create your account' : 'Sign in to continue'}
-            </Text>
-          </View>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {onBack && (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={onBack}
+                disabled={loading}
+              >
+                <Icon name="arrow-left" size={24} color="#fff" />
+              </TouchableOpacity>
+            )}
 
-        <View style={styles.form}>
-          {isSignupMode && (
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              placeholderTextColor="#888"
-              value={fullName}
-              onChangeText={setFullName}
-              autoCapitalize="words"
-              editable={!loading}
-            />
-          )}
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#888"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!loading}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#888"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!loading}
-          />
+            <Animated.View
+              style={[
+                styles.header,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <View style={styles.logoContainer}>
+                <Icon name="wallet-giftcard" size={60} color="#fff" />
+              </View>
+              <Text style={styles.title}>Agentic Wallet</Text>
+              <Text style={styles.subtitle}>
+                {isSignupMode
+                  ? 'Create your account'
+                  : 'Welcome back'}
+              </Text>
+            </Animated.View>
 
-          {isSignupMode && (
-            <View style={styles.goalSection}>
-              <Text style={styles.goalLabel}>Optimization Goal</Text>
-              <View style={styles.goalOptions}>
-                {optimizationGoals.map((goal) => (
+            <Animated.View
+              style={[
+                styles.formCard,
+                {
+                  opacity: fadeAnim,
+                },
+              ]}
+            >
+              <BlurView intensity={20} tint="light" style={styles.blurContainer}>
+                <View style={styles.formContent}>
+                  {isSignupMode && (
+                    <View style={styles.inputContainer}>
+                      <Icon
+                        name="account"
+                        size={20}
+                        color={colors.neutral.dark}
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Full Name"
+                        placeholderTextColor={colors.neutral.main}
+                        value={fullName}
+                        onChangeText={setFullName}
+                        autoCapitalize="words"
+                        editable={!loading}
+                      />
+                    </View>
+                  )}
+
+                  <View style={styles.inputContainer}>
+                    <Icon
+                      name="email"
+                      size={20}
+                      color={colors.neutral.dark}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Email"
+                      placeholderTextColor={colors.neutral.main}
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      editable={!loading}
+                    />
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Icon
+                      name="lock"
+                      size={20}
+                      color={colors.neutral.dark}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={[styles.input, styles.passwordInput]}
+                      placeholder="Password"
+                      placeholderTextColor={colors.neutral.main}
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                      editable={!loading}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.eyeIcon}
+                    >
+                      <Icon
+                        name={showPassword ? 'eye-off' : 'eye'}
+                        size={20}
+                        color={colors.neutral.main}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {isSignupMode && (
+                    <View style={styles.goalSection}>
+                      <Text style={styles.goalLabel}>
+                        Choose your rewards goal
+                      </Text>
+                      <View style={styles.goalOptions}>
+                        {optimizationGoals.map((goal) => {
+                          const isSelected = optimizationGoal === goal.value;
+                          return (
+                            <TouchableOpacity
+                              key={goal.value}
+                              style={[
+                                styles.goalOption,
+                                isSelected && styles.goalOptionSelected,
+                              ]}
+                              onPress={() => setOptimizationGoal(goal.value)}
+                              disabled={loading}
+                            >
+                              {isSelected ? (
+                                <LinearGradient
+                                  colors={goal.gradient}
+                                  style={styles.goalGradient}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 1 }}
+                                >
+                                  <Icon
+                                    name={goal.icon}
+                                    size={18}
+                                    color="#fff"
+                                  />
+                                  <Text style={styles.goalOptionTextSelected}>
+                                    {goal.label}
+                                  </Text>
+                                </LinearGradient>
+                              ) : (
+                                <>
+                                  <Icon
+                                    name={goal.icon}
+                                    size={18}
+                                    color={colors.neutral.dark}
+                                  />
+                                  <Text style={styles.goalOptionText}>
+                                    {goal.label}
+                                  </Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+
                   <TouchableOpacity
-                    key={goal.value}
-                    style={[
-                      styles.goalOption,
-                      optimizationGoal === goal.value && styles.goalOptionSelected
-                    ]}
-                    onPress={() => setOptimizationGoal(goal.value)}
+                    style={[styles.button, loading && styles.buttonDisabled]}
+                    onPress={isSignupMode ? handleSignupPress : handleLoginPress}
                     disabled={loading}
                   >
-                    <Icon
-                      name={goal.icon}
-                      size={16}
-                      color={optimizationGoal === goal.value ? '#4A90E2' : '#666'}
-                    />
-                    <Text style={[
-                      styles.goalOptionText,
-                      optimizationGoal === goal.value && styles.goalOptionTextSelected
-                    ]}>
-                      {goal.label}
-                    </Text>
+                    <LinearGradient
+                      colors={
+                        loading
+                          ? [colors.neutral.light, colors.neutral.main]
+                          : isSignupMode
+                          ? colors.success.gradient
+                          : colors.primary.gradient
+                      }
+                      style={styles.buttonGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.buttonText}>
+                          {isSignupMode ? 'Create Account' : 'Sign In'}
+                        </Text>
+                      )}
+                    </LinearGradient>
                   </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled, isSignupMode && styles.buttonSignup]}
-            onPress={isSignupMode ? handleSignupPress : handleLoginPress}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>
-                {isSignupMode ? 'Sign Up' : 'Login'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              {isSignupMode ? 'Already have an account?' : "Don't have an account?"}
-            </Text>
-            <TouchableOpacity onPress={toggleMode} disabled={loading}>
-              <Text style={styles.signupText}>
-                {isSignupMode ? 'Sign In' : 'Sign Up'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+                  <View style={styles.footer}>
+                    <Text style={styles.footerText}>
+                      {isSignupMode
+                        ? 'Already have an account?'
+                        : "Don't have an account?"}
+                    </Text>
+                    <TouchableOpacity onPress={toggleMode} disabled={loading}>
+                      <Text style={styles.toggleText}>
+                        {isSignupMode ? 'Sign In' : 'Sign Up'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </BlurView>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-// Re-using and adapting styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+  },
+  safeArea: {
+    flex: 1,
   },
   content: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
     justifyContent: 'center',
-    paddingHorizontal: 30,
-    paddingVertical: 20,
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.round,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginBottom: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#4A90E2',
-    marginLeft: 4,
-    fontWeight: '500',
+    marginBottom: spacing.lg,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: spacing.xl,
+  },
+  logoContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: borderRadius.round,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
+    color: colors.text.inverse,
+    marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: 18,
-    color: '#666',
-    marginTop: 8,
+    color: 'rgba(255, 255, 255, 0.9)',
   },
-  form: {
-    width: '100%',
+  formCard: {
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    ...shadows.lg,
+  },
+  blurContainer: {
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+  },
+  formContent: {
+    padding: spacing.xl,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: spacing.sm,
   },
   input: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 12,
+    flex: 1,
     fontSize: 16,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    color: '#333',
+    color: colors.text.primary,
+  },
+  passwordInput: {
+    paddingRight: 40,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: spacing.md,
+    padding: spacing.sm,
+  },
+  goalSection: {
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  goalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  goalOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  goalOption: {
+    flex: 1,
+    minWidth: '47%',
+    maxWidth: '48%',
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+  goalOptionSelected: {
+    ...shadows.md,
+  },
+  goalGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
+  },
+  goalOptionText: {
+    fontSize: 13,
+    color: colors.text.primary,
+    marginLeft: spacing.xs,
+    fontWeight: '500',
+  },
+  goalOptionTextSelected: {
+    fontSize: 13,
+    color: colors.text.inverse,
+    fontWeight: '600',
   },
   button: {
-    backgroundColor: '#4A90E2',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    ...shadows.md,
+    marginTop: spacing.lg,
   },
-  buttonSignup: {
-    marginTop: 5,
+  buttonGradient: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
   },
   buttonDisabled: {
-    backgroundColor: '#A0A0A0',
+    opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
+    color: colors.text.inverse,
     fontSize: 18,
     fontWeight: 'bold',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 30,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    gap: spacing.xs,
   },
   footerText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: colors.text.secondary,
   },
-  signupText: {
-    fontSize: 16,
-    color: '#4A90E2',
-    fontWeight: 'bold',
-    marginLeft: 5,
-  },
-  goalSection: {
-    marginBottom: 8,
-  },
-  goalLabel: {
-    fontSize: 12,
+  toggleText: {
+    fontSize: 15,
+    color: colors.primary.main,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
-  },
-  goalOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
-    justifyContent: 'space-between',
-  },
-  goalOption: {
-    flex: 1,
-    minWidth: '47%',
-    maxWidth: '48%',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 50,
-  },
-  goalOptionSelected: {
-    borderColor: '#4A90E2',
-    backgroundColor: '#F0F7FF',
-  },
-  goalOptionText: {
-    fontSize: 9,
-    color: '#666',
-    marginTop: 2,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  goalOptionTextSelected: {
-    color: '#4A90E2',
-    fontWeight: '700',
   },
 });

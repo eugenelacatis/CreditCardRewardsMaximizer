@@ -3,7 +3,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { colors } from './src/theme';
 
 // Import screens
 import HomeScreen from './src/screens/HomeScreen';
@@ -34,45 +38,123 @@ function MainTabNavigator({ onLogout }) {
           } else if (route.name === 'Cards') {
             iconName = 'credit-card-multiple';
           } else if (route.name === 'Transaction') {
-            iconName = 'shopping';
+            iconName = 'plus-circle';
           } else if (route.name === 'History') {
-            iconName = 'history';
+            iconName = 'chart-timeline-variant';
           } else if (route.name === 'Profile') {
-            iconName = 'account';
+            iconName = 'account-circle';
           }
 
-          return <Icon name={iconName} size={size} color={color} />;
+          return (
+            <View
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: route.name === 'Transaction' ? 60 : 40,
+                height: route.name === 'Transaction' ? 60 : 40,
+                borderRadius: route.name === 'Transaction' ? 30 : 0,
+                marginTop: route.name === 'Transaction' ? -25 : 0,
+              }}
+            >
+              {route.name === 'Transaction' && focused ? (
+                <LinearGradient
+                  colors={colors.primary.gradient}
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 30,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: colors.primary.main,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 8,
+                    elevation: 8,
+                  }}
+                >
+                  <Icon name={iconName} size={32} color="#fff" />
+                </LinearGradient>
+              ) : route.name === 'Transaction' ? (
+                <View
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 30,
+                    backgroundColor: colors.primary.main,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 4,
+                  }}
+                >
+                  <Icon name={iconName} size={28} color="#fff" />
+                </View>
+              ) : (
+                <Icon
+                  name={iconName}
+                  size={focused ? 26 : 24}
+                  color={color}
+                />
+              )}
+            </View>
+          );
         },
-        tabBarActiveTintColor: '#4A90E2',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: colors.primary.main,
+        tabBarInactiveTintColor: colors.neutral.main,
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 0,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 10,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 4,
+        },
         headerShown: false,
+        tabBarHideOnKeyboard: true,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Cards" component={CardsScreen} />
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ tabBarLabel: 'Home' }}
+      />
+      <Tab.Screen
+        name="Cards"
+        component={CardsScreen}
+        options={{ tabBarLabel: 'My Cards' }}
+      />
       <Tab.Screen
         name="Transaction"
         component={TransactionScreen}
-        options={{
-          tabBarIcon: ({ color }) => (
-            <Icon
-              name="plus-circle"
-              size={50}
-              color={color}
-              style={{ marginTop: -20 }}
-            />
-          ),
-        }}
+        options={{ tabBarLabel: 'Scan' }}
       />
-      <Tab.Screen name="History" component={HistoryScreen} />
+      <Tab.Screen
+        name="History"
+        component={HistoryScreen}
+        options={{ tabBarLabel: 'Activity' }}
+      />
 
       {/* We use the render prop (children) syntax for ProfileScreen
         so we can pass the 'onLogout' prop to it.
       */}
-      <Tab.Screen name="Profile">
+      <Tab.Screen
+        name="Profile"
+        options={{ tabBarLabel: 'Profile' }}
+      >
         {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
-
     </Tab.Navigator>
   );
 }
@@ -102,7 +184,20 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            cardStyleInterpolator: ({ current: { progress } }) => ({
+              cardStyle: {
+                opacity: progress,
+              },
+            }),
+            transitionSpec: {
+              open: { animation: 'timing', config: { duration: 300 } },
+              close: { animation: 'timing', config: { duration: 300 } },
+            },
+          }}
+        >
           {isLoggedIn ? (
             // User is logged in: Show the main app (Tab Navigator)
             <Stack.Screen name="MainApp">
