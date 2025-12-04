@@ -112,6 +112,7 @@ The core functionality analyzes each transaction to recommend the optimal credit
 - **Confidence Scoring**: Provides confidence levels for each recommendation
 - **Detailed Explanations**: AI-generated explanations of why a specific card was recommended
 - **Alternative Options**: Shows second and third-best card options with expected values
+- **Credit Score Integration**: Users provide their FICO score during registration, enabling the system to filter and display only credit cards they are likely to qualify for based on typical approval requirements
 
 ### B. Multi-Card Portfolio Management
 
